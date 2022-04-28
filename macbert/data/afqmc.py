@@ -11,15 +11,6 @@ def iter_jsonl(file):
         for line in f:
             yield json.loads(line.strip())
 
-
-def load_jsonl(file):
-    examples = []
-    with open(file, 'r', encoding='utf8') as f:
-        for line in f:
-            line = json.loads(line.strip())
-            examples.append(line)
-    return examples
-
 def get_examples(file, set_type):
     """Creates examples for the training and dev sets."""
     examples = []
