@@ -7,7 +7,7 @@ from transformers import MT5Tokenizer, MT5ForConditionalGeneration
 from transformers.trainer import Trainer, TrainingArguments, EvalPrediction
 import numpy as np
 
-from data.afqmc import AfqmcDataset
+from data.afqmc import AfqmcSeq2SeqDataset
 import utils
 from arguments import parse_args
 
@@ -21,21 +21,23 @@ def compute_metrics(eval_pred: EvalPrediction) -> dict:
     acc = get_acc(eval_pred.predictions, eval_pred.label_ids)
     return {'acc': acc}
 
-def get_dataset(data_dir, phase, tokenizer) -> AfqmcDataset:
-    return AfqmcDataset(data_dir / f'{phase}.json', phase, tokenizer, 128)
+def get_dataset(data_dir, phase, tokenizer) -> AfqmcSeq2SeqDataset:
+    return AfqmcSeq2SeqDataset(data_dir / f'{phase}.json', phase, tokenizer, 128)
 
 
-def get_trainer(model: MT5ForConditionalGeneration, tokenizer: MT5Tokenizer,
-                data_dir: Path, output_dir: Path, args: Namespace) -> Trainer:
+def get_trainer(
+    model: MT5ForConditionalGeneration, tokenizer: MT5Tokenizer, data_dir: Path,
+    output_dir: Path, args: Namespace) -> Trainer:
+
     train_dataset = get_dataset(data_dir, 'train', tokenizer=tokenizer)
     eval_dataset = get_dataset(data_dir, 'dev', tokenizer=tokenizer)
     
     # Hyperparameters
     batch_size = args.batch_size
-    grad_acc_steps = 16
-    num_epochs = 2
+    grad_acc_steps = args.grad_acc_steps
+    num_epochs = args.num_epochs
     warmup_ratio = 0.1
-    lr = 2e-4
+    lr = args.lr
     
     train_args = TrainingArguments(
         output_dir=output_dir,
@@ -65,7 +67,7 @@ def get_trainer(model: MT5ForConditionalGeneration, tokenizer: MT5Tokenizer,
     return trainer
 
 
-def predict(trainer: Trainer, dataset: AfqmcDataset, output_dir: Path):
+def predict(trainer: Trainer, dataset: AfqmcSeq2SeqDataset, output_dir: Path):
     pred_out = trainer.predict(dataset)
     preds = pred_out.predictions[1]
     print('\nTest result:')

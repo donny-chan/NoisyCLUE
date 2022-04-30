@@ -2,4 +2,4 @@ data/*
 results
 wandb
 __pycache__
-
+slurm-*.out
