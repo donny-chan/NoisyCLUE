@@ -6,18 +6,19 @@ from argparse import Namespace
 from transformers import BertForSequenceClassification, BertTokenizer
 from transformers.trainer import Trainer, TrainingArguments
 import numpy as np
+import torch
 
 from data.afqmc import AfqmcDataset
 import utils
 from arguments import parse_args
 
 
-def get_accuracy(preds: np.array, labels: np.array) -> float:
+def get_test_acc(preds: np.array, labels: np.array) -> float:
     return (np.argmax(preds, axis=1) == labels).mean()
 
 
 def _get_dataset(file: Path, phase: str, **kwargs) -> AfqmcDataset:
-    # kwargs['num_examples'] = 128  # for debugging
+    kwargs['num_examples'] = 128  # for debugging
     return AfqmcDataset(file, phase, max_seq_len=512, **kwargs)
 
 
@@ -66,30 +67,42 @@ def get_trainer(model: BertForSequenceClassification, tokenizer: BertTokenizer,
         train_dataset=train_dataset, 
         eval_dataset=eval_dataset,
     )
+    trainer.preprocess_logits_for_metrics = lambda logits, labels: torch.argmax(logits, dim=1)
     return trainer
-
 
 
 def predict(trainer: Trainer, dataset: AfqmcDataset, output_dir: Path):
     def parse_result(result):
         return {'loss': result.metrics['test_loss'],
-                'acc': get_accuracy(result.predictions, result.label_ids),}
+                'acc': get_test_acc(result.predictions, result.label_ids)}
 
     result = trainer.predict(dataset)
+    print(result)
+    exit()
 
     result_dict = parse_result(result)
     print('Test result:')
     print('loss:', result_dict['loss'])
     print('acc:', result_dict['acc'])
 
-    preds = np.argmax(result.predictions, axis=1)
+    # Save result
+    output_dir.mkdir(exist_ok=True, parents=True)
+    preds = np.argmax(result.predictions, axis=1) # (N, C) -> (N)
     utils.dump_str(list(preds), output_dir / 'preds.txt')
     utils.dump_json(result_dict, output_dir / 'result.json')
 
 
+def train(trainer: Trainer, args: Namespace):
+    train_args = {}
+    train_args['resume_from_checkpoint'] = True
+    if args.resume_from_checkpoint:
+        train_args['resume_from_checkpoint'] = True
+    trainer.train(**train_args)
+
+
 # Setup
-args = parse_args()
 MODEL_PATH = 'hfl/chinese-macbert-base'
+args = parse_args()
 output_dir = Path(args.output_dir)
 data_dir = Path(args.data_dir)
 os.environ["WANDB_DISABLED"] = "true"
@@ -102,10 +115,10 @@ print(json.dumps(vars(args), indent=2, ensure_ascii=False))
 tokenizer = BertTokenizer.from_pretrained(MODEL_PATH)
 model = BertForSequenceClassification.from_pretrained(MODEL_PATH).cuda()
 trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
-trainer.train(resume_from_checkpoint=True)
+train(trainer, args)
 
 # Test
-def test(trainer, trokenizer, data_dir):
+def test(trainer, tokenizer, data_dir):
     print('Preparing test data')
     for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
         print('\nTesting phase:', test_phase)

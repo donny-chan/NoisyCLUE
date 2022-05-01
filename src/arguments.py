@@ -11,6 +11,9 @@ def parse_args():
     p.add_argument('--lr', type=float, default=2e-5)
     p.add_argument('--grad_acc_steps', type=int, default=16)
 
+    # Saving/loading
+    p.add_argument('--resume_from_checkpoint', action='store_true')
+
     # Logging
     p.add_argument('--log_interval', type=int, default=5)
     p.add_argument('--tqdm', action='store_true')

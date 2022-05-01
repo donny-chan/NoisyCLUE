@@ -77,7 +77,10 @@ class AfqmcDataset(Dataset):
 
 class AfqmcSeq2SeqDataset(Dataset):
     def __init__(self, file: str, phase: str, tokenizer, num_examples: int=None):
+        self.verbalizer = ['non_equivalent', 'equivalent']
         self.file = file
+        self.tokenizer = tokenizer
+
         examples = get_examples(file, phase)[:num_examples]
         self.features = self.get_features(examples, tokenizer)
 
@@ -96,14 +99,13 @@ class AfqmcSeq2SeqDataset(Dataset):
         }
         ```
         '''
-        verbalizer = {'0': 'non_equivalent', '1': 'equivalent'}
         source_template = 'afqmc。句子1：{}，句子2：{}。'
         texts = [source_template.format(ex['text'][0], ex['text'][1]) for ex in examples]
-        labels = [verbalizer[ex['label']] for ex in examples]
+        label_ids = [int(ex['label']) for ex in examples]
+        labels = [self.verbalizer[label_id] for label_id in label_ids]
         input_ids = tokenizer(texts, padding=True).input_ids
         labels = tokenizer(labels, padding=True).input_ids
         return {'input_ids': input_ids, 'labels': labels}
-
 
     def __getitem__(self, idx):
         return {

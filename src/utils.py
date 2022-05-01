@@ -24,3 +24,6 @@ def dump_args(args, file: Path):
 
 def dump_json(data, file: Path, **kwargs):
     json.dump(data, file.open('w'), ensure_ascii=False, **kwargs)
+
+def get_acc(preds: np.array, labels: np.array) -> float:
+    return np.mean(np.argmax(preds, axis=1) == labels)
