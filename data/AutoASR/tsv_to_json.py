@@ -44,9 +44,10 @@ def process_test_data(data_dir: str):
         dump_json(parsed, f'{data_dir}/test_{name}.json')
 
 
-data_dir = 'afqmc_unbalanced'
-print('processing train data...')
-process_train_data(data_dir)
-print('processing test data...')
-process_test_data(data_dir)
+for data_dir in ['afqmc_unbalanced', 'afqmc_balanced']:
+    print('Processing', data_dir)
+    print('processing train data...')
+    process_train_data(data_dir)
+    print('processing test data...')
+    process_test_data(data_dir)
 print('done')
