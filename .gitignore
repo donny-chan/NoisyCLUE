@@ -1,5 +1,5 @@
-data/**/*.json
-data/**/*.tsv
+# data/**/*.json
+# data/**/*.tsv
 results
 wandb
 .DS_Store
