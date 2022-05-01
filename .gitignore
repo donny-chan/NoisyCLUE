@@ -1,5 +1,7 @@
-data/*
+data/**/*.json
+data/**/*.tsv
 results
 wandb
+.DS_Store
 __pycache__
 slurm-*.out
