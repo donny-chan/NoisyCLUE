@@ -27,3 +27,6 @@ def dump_json(data, file: Path, **kwargs):
 
 def get_acc(preds: np.array, labels: np.array) -> float:
     return np.mean(np.argmax(preds, axis=1) == labels)
+
+def get_param_count(model: torch.nn.Module) -> int:
+    return sum(p.numel() for p in model.parameters())

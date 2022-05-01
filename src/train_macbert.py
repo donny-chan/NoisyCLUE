@@ -67,7 +67,6 @@ def get_trainer(model: BertForSequenceClassification, tokenizer: BertTokenizer,
         train_dataset=train_dataset, 
         eval_dataset=eval_dataset,
     )
-    trainer.preprocess_logits_for_metrics = lambda logits, labels: torch.argmax(logits, dim=1)
     return trainer
 
 
@@ -77,9 +76,6 @@ def predict(trainer: Trainer, dataset: AfqmcDataset, output_dir: Path):
                 'acc': get_test_acc(result.predictions, result.label_ids)}
 
     result = trainer.predict(dataset)
-    print(result)
-    exit()
-
     result_dict = parse_result(result)
     print('Test result:')
     print('loss:', result_dict['loss'])
