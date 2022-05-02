@@ -97,7 +97,7 @@ def train(trainer: Trainer, args: Namespace):
 
 
 # Setup
-MODEL_PATH = 'hfl/chinese-macbert-base'
+# MODEL_PATH = 'hfl/chinese-macbert-base'
 args = parse_args()
 output_dir = Path(args.output_dir)
 data_dir = Path(args.data_dir)
@@ -107,9 +107,12 @@ utils.set_seed(0)
 utils.dump_args(args, output_dir / 'train_args.json')
 print(json.dumps(vars(args), indent=2, ensure_ascii=False))
 
+# Model
+tokenizer = BertTokenizer.from_pretrained(args.model_path)
+model = BertForSequenceClassification.from_pretrained(args.model_path).cuda()
+print('# params:', utils.get_param_count(model))
+
 # Train
-tokenizer = BertTokenizer.from_pretrained(MODEL_PATH)
-model = BertForSequenceClassification.from_pretrained(MODEL_PATH).cuda()
 trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
 train(trainer, args)
 

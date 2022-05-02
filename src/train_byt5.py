@@ -5,9 +5,9 @@ import time
 from pathlib import Path
 from argparse import Namespace
 
-from transformers import MT5Tokenizer, MT5ForConditionalGeneration
+from transformers import T5ForConditionalGeneration, AutoTokenizer
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
-import numpy as np
+from transformers.trainer import EvalPrediction
 from torch.utils.data import DataLoader
 
 from data.afqmc import AfqmcSeq2SeqDataset
@@ -21,6 +21,11 @@ def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor) ->
     labels: (N, seq_len)
     '''
     return torch.argmax(logits, dim=2)  # (N, seq_len, vocab_size) -> (N, seq_len)
+
+
+def compute_metrics(eval_pred: EvalPrediction) -> dict:
+    acc = utils.get_acc(eval_pred.predictions, eval_pred.label_ids)
+    return {'acc': acc}
 
 
 def get_test_acc(preds: torch.Tensor, labels: torch.Tensor) -> float:
@@ -48,7 +53,7 @@ def get_dataset(data_dir: Path, phase: str, **kwargs) -> AfqmcSeq2SeqDataset:
 
 
 def get_trainer(
-    model: MT5ForConditionalGeneration, tokenizer: MT5Tokenizer, data_dir: Path,
+    model: T5ForConditionalGeneration, tokenizer: AutoTokenizer, data_dir: Path,
     output_dir: Path, args: Namespace) -> Seq2SeqTrainer:
 
     train_dataset = get_dataset(data_dir, 'train', tokenizer=tokenizer)
@@ -108,8 +113,8 @@ def train(trainer: Seq2SeqTrainer, args: Namespace):
     print('Training time:', time_elapsed)
 
 
-def predict(trainer: Seq2SeqTrainer, dataset: AfqmcSeq2SeqDataset,
-            output_dir: Path, args: Namespace):
+def predict(trainer: Seq2SeqTrainer, dataset: AfqmcSeq2SeqDataset, output_dir: Path, 
+        args: Namespace):
     def collate_fn(examples: list):
         '''Each element in `examples` is a dict from str to list.'''
         batch = {}
@@ -127,6 +132,7 @@ def predict(trainer: Seq2SeqTrainer, dataset: AfqmcSeq2SeqDataset,
     acc = 0
     num_steps = 0
     all_preds = []
+    
     for step, batch in enumerate(dataloader):
         loss, logits, labels = prediction_step(batch)
         logits = logits[0]
@@ -137,7 +143,7 @@ def predict(trainer: Seq2SeqTrainer, dataset: AfqmcSeq2SeqDataset,
         acc += get_test_acc(preds, labels)
         num_steps += 1
 
-    # Average
+    # Get result
     acc /= num_steps
     loss = total_loss / num_steps
     result = {
@@ -162,9 +168,10 @@ utils.set_seed(0)
 utils.dump_args(args, output_dir / 'train_args.json')
 
 # Get model
-model = MT5ForConditionalGeneration.from_pretrained(args.model_path)
-tokenizer = MT5Tokenizer.from_pretrained(args.model_path)
-print('# parameters:', utils.get_param_count(model))
+model = T5ForConditionalGeneration.from_pretrained(args.model_path)
+tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+# model = model.cuda()
+print('# params:', utils.get_param_count(model))
 
 # Train
 trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
