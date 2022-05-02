@@ -1,12 +1,13 @@
+import torch
+assert torch.cuda.is_available()
+
 import os
-import json
 from pathlib import Path
 from argparse import Namespace
 
 from transformers import BertForSequenceClassification, BertTokenizer
 from transformers.trainer import Trainer, TrainingArguments
 import numpy as np
-import torch
 
 from data.afqmc import AfqmcDataset
 import utils
@@ -18,7 +19,7 @@ def get_test_acc(preds: np.array, labels: np.array) -> float:
 
 
 def _get_dataset(file: Path, phase: str, **kwargs) -> AfqmcDataset:
-    kwargs['num_examples'] = 128  # for debugging
+    # kwargs['num_examples'] = 128  # for debugging
     return AfqmcDataset(file, phase, max_seq_len=512, **kwargs)
 
 
@@ -91,16 +92,8 @@ def train(trainer: Trainer, args: Namespace):
         train_args['resume_from_checkpoint'] = True
     trainer.train(**train_args)
 
-# Test
-def test(trainer, tokenizer, data_dir):
-    print('Preparing test data')
-    for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
-        print('\nTesting phase:', test_phase)
-        data = get_dataset(data_dir, test_phase, tokenizer=tokenizer)
-        predict(trainer, data, output_dir / test_phase)
 
 # Setup
-# MODEL_PATH = 'hfl/chinese-macbert-base'
 args = parse_args()
 output_dir = Path(args.output_dir)
 data_dir = Path(args.data_dir)
@@ -117,4 +110,13 @@ print('# params:', utils.get_param_count(model))
 # Train
 trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
 train(trainer, args)
+
+# Test
+def test(trainer, tokenizer, data_dir):
+    print('Preparing test data')
+    for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
+        print('\nTesting phase:', test_phase)
+        data = get_dataset(data_dir, test_phase, tokenizer=tokenizer)
+        predict(trainer, data, output_dir / test_phase)
+
 test(trainer, tokenizer, data_dir)
