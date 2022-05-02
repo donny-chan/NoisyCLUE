@@ -1,10 +1,10 @@
 #!/bin/bash
 #SBATCH -p rtx2080
 #SBATCH -G 1
-#SBATCH --job-name bert-afqmc
+#SBATCH --job-name rb-afqmc
 
 model_path="chinese-roberta-wwm-ext"
-task="afqmc_unbalanced"
+task="afqmc_balanced"
 lr="3e-5"
 
 output_dir="results/$task/${model_path}_lr${lr}"

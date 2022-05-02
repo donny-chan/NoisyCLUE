@@ -114,7 +114,3 @@ class AfqmcSeq2SeqDataset(Dataset):
         }
     def __len__(self):
         return len(self.features['input_ids'])
-
-
-def get_dataloader(dataset: Dataset, batch_size: int, shuffle: bool):
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)

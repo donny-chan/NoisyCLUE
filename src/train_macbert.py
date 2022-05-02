@@ -18,7 +18,7 @@ def get_test_acc(preds: np.array, labels: np.array) -> float:
 
 
 def _get_dataset(file: Path, phase: str, **kwargs) -> AfqmcDataset:
-    kwargs['num_examples'] = 128  # for debugging
+    # kwargs['num_examples'] = 128  # for debugging
     return AfqmcDataset(file, phase, max_seq_len=512, **kwargs)
 
 

@@ -2,7 +2,7 @@
 #SBATCH -p rtx2080
 #SBATCH --nodes 1
 #SBATCH --gpus-per-node 1
-#SBATCH --job-name=byT5-afqmc
+#SBATCH --job-name=byT5-unbalanced
 
 num_gpus=1
 lr="3e-4"
