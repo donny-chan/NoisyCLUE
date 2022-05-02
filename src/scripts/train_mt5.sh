@@ -4,8 +4,8 @@
 #SBATCH --gpus-per-node 1
 #SBATCH --job-name=mT5-balanced
 
-lr="3e-4"
-task="afqmc_unbalanced"
+lr="1e-4"
+task="afqmc_balanced"
 model_name="mt5-base"
 
 data_dir="../data/AutoASR/$task"
@@ -22,7 +22,7 @@ cmd+=" --log_interval 20"
 cmd+=" --num_epochs 10"
 cmd+=" --batch_size 16"
 cmd+=" --grad_acc_steps 16"
-cmd+=" --lr 3e-4"
+cmd+=" --lr ${lr}"
 # cmd+=" --resume_from_checkpoint"
 
 logfile="$output_dir/log.txt"

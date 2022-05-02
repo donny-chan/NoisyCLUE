@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -p rtx2080
 #SBATCH -G 1
-#SBATCH --job-name rb-afqmc
+#SBATCH --job-name rb-balanced
 
 model_path="chinese-roberta-wwm-ext"
 task="afqmc_balanced"
