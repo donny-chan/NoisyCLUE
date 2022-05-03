@@ -99,13 +99,11 @@ def get_trainer(
 
 def train(trainer: Seq2SeqTrainer, args: Namespace):
     train_args = {}
-    # train_args['resume_from_checkpoint'] = True
     if args.resume_from_checkpoint:
         train_args['resume_from_checkpoint'] = True
     start_time = time.time()
     trainer.train(**train_args)
-    time_elapsed = time.time() - start_time
-    print('Training time:', time_elapsed)
+    print('Training time:', time.time() - start_time)
 
 
 def predict(trainer: Seq2SeqTrainer, dataset: AfqmcSeq2SeqDataset,
@@ -154,6 +152,15 @@ def predict(trainer: Seq2SeqTrainer, dataset: AfqmcSeq2SeqDataset,
     utils.dump_json(pred_texts, output_dir / 'preds_text.json')
 
 
+def test(trainer: Seq2SeqTrainer, tokenizer, data_dir: Path):
+    for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
+        start_time = time.time()
+        print('\nTesting phase:', test_phase)
+        data = get_dataset(data_dir, test_phase, tokenizer=tokenizer)
+        predict(trainer, data, output_dir / test_phase, args)
+        print('Testing time:', time.time() - start_time)
+
+
 args = parse_args()
 output_dir = Path(args.output_dir)
 data_dir = Path(args.data_dir)
@@ -166,15 +173,7 @@ model = MT5ForConditionalGeneration.from_pretrained(args.model_path)
 tokenizer = MT5Tokenizer.from_pretrained(args.model_path)
 print('# parameters:', utils.get_param_count(model))
 
-# Train
+# Train and test
 trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
 train(trainer, args)
-
-# Test
-def test_all(trainer: Seq2SeqTrainer, tokenizer, data_dir: Path):
-    for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
-        print('\nTesting phase:', test_phase)
-        data = get_dataset(data_dir, test_phase, tokenizer=tokenizer)
-        predict(trainer, data, output_dir / test_phase, args)
-
-test_all(trainer, tokenizer, data_dir)
+test(trainer, tokenizer, data_dir)

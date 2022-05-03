@@ -1,9 +1,10 @@
 #!/bin/bash
 #SBATCH -p rtx2080
 #SBATCH -G 1
-#SBATCH --job-name rb-balanced
+#SBATCH --job-name mb-balanced
 
-model_path="chinese-roberta-wwm-ext"
+# model_path="chinese-roberta-wwm-ext"
+model_path="macbert-base"
 task="afqmc_balanced"
 lr="3e-5"
 

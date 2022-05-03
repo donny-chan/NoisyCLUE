@@ -77,7 +77,7 @@ class AfqmcDataset(Dataset):
 
 class AfqmcSeq2SeqDataset(Dataset):
     def __init__(self, file: str, phase: str, tokenizer, num_examples: int=None):
-        self.verbalizer = ['non_equivalent', 'equivalent']
+        self.verbalizer = ['nonequivalent', 'equivalent']
         self.file = file
         self.tokenizer = tokenizer
 

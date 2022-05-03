@@ -5,3 +5,5 @@ wandb
 .DS_Store
 __pycache__
 slurm-*.out
+all_tsv
+data/afqmc/*

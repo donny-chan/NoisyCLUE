@@ -4,7 +4,7 @@
 #SBATCH --gpus-per-node 1
 #SBATCH --job-name=mT5-balanced
 
-lr="1e-4"
+lr="3e-4"
 task="afqmc_balanced"
 model_name="mt5-base"
 

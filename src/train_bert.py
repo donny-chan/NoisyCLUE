@@ -1,7 +1,6 @@
 import torch
 assert torch.cuda.is_available()
 
-import os
 from pathlib import Path
 from argparse import Namespace
 
@@ -93,11 +92,19 @@ def train(trainer: Trainer, args: Namespace):
     trainer.train(**train_args)
 
 
+def test(trainer, tokenizer, data_dir):
+    print('Preparing test data')
+    for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
+        print('\nTesting phase:', test_phase)
+        data = get_dataset(data_dir, test_phase, tokenizer=tokenizer)
+        predict(trainer, data, output_dir / test_phase)
+
+
 # Setup
 args = parse_args()
 output_dir = Path(args.output_dir)
 data_dir = Path(args.data_dir)
-os.environ["WANDB_DISABLED"] = "true"
+# os.environ["WANDB_DISABLED"] = "true"
 
 utils.set_seed(0)
 utils.dump_args(args, output_dir / 'train_args.json')
@@ -110,13 +117,4 @@ print('# params:', utils.get_param_count(model))
 # Train
 trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
 train(trainer, args)
-
-# Test
-def test(trainer, tokenizer, data_dir):
-    print('Preparing test data')
-    for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
-        print('\nTesting phase:', test_phase)
-        data = get_dataset(data_dir, test_phase, tokenizer=tokenizer)
-        predict(trainer, data, output_dir / test_phase)
-
 test(trainer, tokenizer, data_dir)
