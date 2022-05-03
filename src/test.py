@@ -1,9 +1,6 @@
-def f(x, **kwargs):
-    # print(args)
-    # print(args)
-    # print(type(args))
-    print(kwargs)
-    print(type(kwargs))
-    return x
+import argparse 
 
-x = f(2, a=1, b=2)
+p = argparse.ArgumentParser()
+p.add_argument('--num', type=int)
+p = p.parse_args()
+print(p)

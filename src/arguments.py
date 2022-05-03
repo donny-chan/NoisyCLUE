@@ -13,6 +13,7 @@ def parse_args():
     p.add_argument('--grad_acc_steps', type=int, default=16)
     p.add_argument('--fp16', action='store_true', help='Not working on Google\'s models')
     p.add_argument('--bf16', action='store_true', help='Not working on Google\'s models')
+    p.add_argument('--seed', type=int, default=0)
 
     # Saving/loading
     p.add_argument('--resume_from_checkpoint', action='store_true')
@@ -20,5 +21,8 @@ def parse_args():
     # Logging
     p.add_argument('--log_interval', type=int, default=5)
     p.add_argument('--tqdm', action='store_true')
+
+    # Debugging
+    p.add_argument('--num_examples', type=int)
 
     return p.parse_args()

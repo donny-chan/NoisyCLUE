@@ -2,11 +2,11 @@
 #SBATCH -p rtx2080
 #SBATCH --nodes 1
 #SBATCH --gpus-per-node 1
-#SBATCH --job-name=byT5-unbalanced
+#SBATCH --job-name=byT5-balanced
 
 num_gpus=1
 lr="3e-4"
-task="afqmc_unbalanced"
+task="afqmc_balanced"
 model_name="byt5-base"
 
 output_dir="results/$task/${model_name}_lr${lr}"
@@ -19,7 +19,7 @@ cmd+=" --model_path google/$model_name"
 cmd+=" --output_dir $output_dir"
 cmd+=" --data_dir $data_dir"
 cmd+=" --log_interval 20"
-cmd+=" --num_epochs 6"
+cmd+=" --num_epochs 10"
 cmd+=" --batch_size 2"
 cmd+=" --grad_acc_steps 128"
 cmd+=" --lr $lr"
