@@ -1,15 +1,16 @@
 #!/bin/bash
 #SBATCH -p rtx2080
 #SBATCH -G 1
-#SBATCH --job-name rb-balanced
+#SBATCH --job-name mb-unbalanced
 
-model_path="chinese-roberta-wwm-ext"
-# model_path="chinese-macbert-base"
-task="afqmc_balanced"
+# model_path="chinese-roberta-wwm-ext"
+model_path="chinese-macbert-base"
+task="afqmc_unbalanced"
+task_parent="Keyboard"
 lr="5e-5"
 
-output_dir="results/$task/${model_path}_lr${lr}"
-data_dir="../data/AutoASR/$task"
+output_dir="results/${task_parent}_${task}/${model_path}_lr${lr}"
+data_dir="../data/${task_parent}/${task}"
 
 # Command
 cmd="python3 train_bert.py"

@@ -1,59 +1,45 @@
 from pathlib import Path
 import json
+from collections import defaultdict
+
+from metrics import get_bin_metrics
+
+from print_utils import print_table, dump_table
 
 
-# label_texts = ['nonequivalent</s>', 'equivalent</s>']
-label_to_id = {'nonequivalent</s>': 0, 'equivalent</s>': 1}
-label_to_id = {'non_equivalent</s>': 0, 'equivalent</s> <pad>': 1}
-task = 'afqmc_unbalanced'
-# model_pattern = 'mt5-base_lr*'
+task = 'afqmc_balanced'
+
+# Changed labels from "non_equivalent" to "nonequivalent"
+results_dir = 'results_1'
+label_to_id = {
+    'nonequivalent</s>': 0, 
+    "eonequivalent</s>": 0,
+    'equivalent</s>': 1, 
+    'nquivalent</s><pad><pad><pad>': 1,
+    "equivalent</s><pad><pad><pad>" : 1,
+}
+
+# Chinese labels: ["不等价", "等价"]
+results_dir = 'results'
+# results_dir = 'results_zh_verbalizer'
+# label_to_id = {
+#     "不等价</s>": 0,
+#     "等等价</s>": 0,
+#     "等价</s> <pad>": 1,
+# }
+
+# results_dir = 'results_0'
+# label_to_id = {'non_equivalent</s>': 0, 'equivalent</s> <pad>': 1}
+
 model_pattern = '*'
+# model_pattern = 'mt5-base_lr*'
+
 
 def get_labels():
     test_file = Path(f'../data/AutoASR/{task}/test_clean.json')
     test_data = [json.loads(line) for line in test_file.open('r')]
     labels = [int(d['label']) for d in test_data]
     return labels
-
-
-def print_table(rows, headers, types):
-    def to_str(x, type):
-        if x is None:
-            return '-'
-        if type is float:
-            return f'{x:.4f}'
-        return str(x)
-
-    def _print_row(row, lens):
-        for i, x in enumerate(row):
-            s = f'| {x}'
-            s += ' ' * (lens[i] - len(x) + 1)
-            print(s, end='')
-        print('|')
-
-    def _print_hor_line(lens):
-        for i, x in enumerate(lens):
-            print('+', end='')
-            print('-' * (x + 2), end='')
-        print('+')
-
-    rows = [[to_str(x, t) for x, t in zip(row, types)] for row in rows]
-    # Get len of columns
-    col_lens = [len(h) for h in headers]
-    for row in rows:
-        for i in range(len(col_lens)):
-            col_lens[i] = max(col_lens[i], len(row[i]))
-
-    def print_row(row): _print_row(row, col_lens)
-    def print_hor_line(): _print_hor_line(col_lens)
-
-    # Print
-    print_hor_line()
-    print_row(headers)
-    print_hor_line()
-    for row in rows:
-        print_row(row)
-    print_hor_line()
 
 
 def get_acc(preds, labels) -> float:
@@ -65,11 +51,11 @@ def get_acc(preds, labels) -> float:
     return correct / len(preds)
 
 
-def get_preds(dir, is_seq2seq) -> list:
+def get_preds(dir) -> list:
     try:
-        if is_seq2seq:
-            result_file = dir / 'preds_text.json'
-            preds = json.load(result_file.open('r'))
+        preds_text_file = dir / 'preds_text.json'
+        if preds_text_file.exists():
+            preds = json.load(preds_text_file.open('r'))
             pred_ids = [label_to_id.get(x, -1) for x in preds]
             return pred_ids
         else:
@@ -79,21 +65,20 @@ def get_preds(dir, is_seq2seq) -> list:
         return None
 
 
-def get_result(result_dir, labels, is_seq2seq):
+def get_result(result_dir, labels):
     data_names = ['clean', 'noisy_1', 'noisy_2', 'noisy_3']
-    result = {}
-    for data_name in data_names:
-        try:
-            result_file = result_dir / f'test_{data_name}' / 'result.json'
-            acc = json.load(result_file.open('r'))['acc']
-            result[f'acc_{data_name}'] = acc
-        except Exception:
-            continue
+    result = defaultdict()
+    # for data_name in data_names:
+    #     try:
+    #         result_file = result_dir / f'test_{data_name}' / 'result.json'
+    #         acc = json.load(result_file.open('r'))['acc']
+    #         result[f'acc_{data_name}'] = acc
+    #     except Exception:
+    #         continue
 
-    noisy_accs = [result.get(x, None) for x in ['acc_noisy_1', 'acc_noisy_2', 'acc_noisy_3']]
-    if None in noisy_accs:
-        return result
-    result['avg'] = sum(noisy_accs) / len(noisy_accs)
+    # noisy_accs = [result.get(x, None) for x in ['acc_noisy_1', 'acc_noisy_2', 'acc_noisy_3']]
+    # if None in noisy_accs:
+    #     return result
 
     def get_worst_group_acc():
         noisy_preds = []
@@ -101,7 +86,7 @@ def get_result(result_dir, labels, is_seq2seq):
         if len(noisy_dirs) != 3:
             return None
         for dir in noisy_dirs:
-            preds = get_preds(dir, is_seq2seq)
+            preds = get_preds(dir)
             if preds is None:
                 return None
             noisy_preds.append(preds)
@@ -112,27 +97,67 @@ def get_result(result_dir, labels, is_seq2seq):
                 correct += 1
         return correct / count
 
+
+    def get_avg_acc(results):
+        noisy_accs = [result.get(x, None) for x in ['acc_noisy_1', 'acc_noisy_2', 'acc_noisy_3']]
+        if None in noisy_accs:
+            return None
+        return sum(noisy_accs) / len(noisy_accs)
+    
+
+    def get_metrics(result: dict, dir):
+        for data_name in data_names:
+            preds = get_preds(dir / f'test_{data_name}')
+            if preds == None:
+                continue
+            # print(dir, data_name)
+            metrics = get_bin_metrics(labels, preds)
+            if data_name == 'clean':
+                result['macro_f1_{}'.format(data_name)] = metrics.get('macro_f1', None)
+            result[f'f1_0_{data_name}'] = metrics.get('f1_0', None)
+            result[f'f1_1_{data_name}'] = metrics.get('f1_1', None)
+            result[f'acc_{data_name}'] = metrics.get('acc', None)
+
+    get_metrics(result, result_dir)
     result['worst_group'] = get_worst_group_acc()
+    result['avg'] = get_avg_acc(result)
     return result
 
 
 data_names = ['clean', 'noisy_1', 'noisy_2', 'noisy_3']
 test_names = [f'test_{x}' for x in data_names]
 labels = get_labels()
+results_dir = Path(results_dir) / task
 
-results_dir = Path('results_0') / task
+headers = {
+    'model': str,
+    'acc_clean': float,
+    'acc_noisy_1': float,
+    'acc_noisy_2': float,
+    'acc_noisy_3': float,
+    'avg': float,
+    'worst_group': float,
+    'macro_f1_clean': float,
+    'f1_0_clean': float,
+    'f1_1_clean': float,
+    'f1_0_noisy_1': float,
+    'f1_1_noisy_1': float,
+    'f1_0_noisy_2': float,
+    'f1_1_noisy_2': float,
+    'f1_0_noisy_3': float,
+    'f1_1_noisy_3': float,
+}
+types = list(headers.values())
+headers = list(headers.keys())
 
-# types = [str, str, float, float]
-# headers = ['model', 'data', 'loss', 'acc']
-headers = ['model'] + [f'acc_{x}' for x in data_names] + ['avg', 'worst_group']
-types = [str] + [float] * 6
+print(f'Getting results from {results_dir}')
 rows = []
-
 for result_dir in sorted(results_dir.glob(model_pattern)):
-    is_seq2seq = any(x in result_dir.name for x in ['mt5', 'byt5'])
-    result = get_result(result_dir, labels, is_seq2seq)
+    result = get_result(result_dir, labels)
     row = [result.get(h, None) for h in headers[1:]]
     row = [result_dir.name] + row
     rows.append(row)
 
+headers = [h.replace('_', ' ') for h in headers]
 print_table(rows, headers, types)
+dump_table(rows, headers, types, 'table.tsv')

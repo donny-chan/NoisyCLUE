@@ -5,7 +5,7 @@
 #SBATCH --job-name=byT5-balanced
 
 num_gpus=1
-lr="3e-4"
+lr="2e-4"
 task="afqmc_balanced"
 model_name="byt5-base"
 

@@ -77,6 +77,7 @@ class AfqmcDataset(Dataset):
 
 class AfqmcSeq2SeqDataset(Dataset):
     def __init__(self, file: str, phase: str, tokenizer, num_examples: int=None):
+        # self.verbalizer = ['不等价', '等价']
         self.verbalizer = ['nonequivalent', 'equivalent']
         self.file = file
         self.tokenizer = tokenizer
@@ -88,29 +89,35 @@ class AfqmcSeq2SeqDataset(Dataset):
         '''
         A feature for seq2seq is a pair of input_ids and labels.
 
-        input text template:  "afqmc。句子1：{}，句子2：{}。"
+        input text template:  "句子1：{}，句子2：{}。"
         output text template: "{}"
 
         Return:
         ```
         {
             'input_ids': [...],
-            'labels': [...]
+            'attention_mask': [...],
+            'labels': [...],
+            'label_ids': [...],
         }
         ```
         '''
-        source_template = 'afqmc。句子1：{}，句子2：{}。'
+        source_template = '句子1：{}，句子2：{}。'
         texts = [source_template.format(ex['text'][0], ex['text'][1]) for ex in examples]
         label_ids = [int(ex['label']) for ex in examples]
         labels = [self.verbalizer[label_id] for label_id in label_ids]
-        input_ids = tokenizer(texts, padding=True).input_ids
-        labels = tokenizer(labels, padding=True).input_ids
-        return {'input_ids': input_ids, 'labels': labels}
+        inputs = tokenizer(texts, padding='longest', return_tensors='pt')  # {'input_ids': Tensor, 'attention_mask': Tensor}
+        labels = tokenizer(labels, padding='longest', return_tensors='pt').input_ids
+        inputs['labels'] = labels
+        # inputs['label_ids'] = torch.tensor(label_ids)
+        inputs['label_ids'] = label_ids
+        return inputs
 
     def __getitem__(self, idx):
         return {
             k: self.features[k][idx] for k in 
-            ['input_ids', 'labels']
+            ['input_ids', 'attention_mask', 'labels', 'label_ids']
         }
+
     def __len__(self):
         return len(self.features['input_ids'])

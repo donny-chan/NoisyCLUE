@@ -3,9 +3,10 @@ from argparse import Namespace
 
 import torch
 from torch.utils.data import DataLoader
-from transformers import Seq2SeqTrainer
+from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 
 from data.afqmc import AfqmcSeq2SeqDataset
+import utils
 
 
 def _get_dataset(file: Path, phase: str, **kwargs) -> AfqmcSeq2SeqDataset:
@@ -17,9 +18,9 @@ def get_dataset(data_dir: Path, phase: str, **kwargs) -> AfqmcSeq2SeqDataset:
 
 
 def predict(
-    trainer: Seq2SeqTrainer, 
+    # trainer: Seq2SeqTrainer, 
+    model, tokenizer,
     dataset: AfqmcSeq2SeqDataset, 
-    output_dir: Path,
     args: Namespace,
     ) -> tuple:
     '''
@@ -40,37 +41,113 @@ def predict(
         return correct / count
 
     def collate_fn(examples: list):
-        '''Each element in `examples` is a dict from str to list.'''
+        '''Each element in `examples` is a dict {str: list}.'''
         batch = {}
-        for key in examples[0].keys():
-            batch[key] = torch.tensor([x[key] for x in examples])
+        for key in ['input_ids', 'attention_mask']:
+            batch[key] = torch.tensor([x[key] for x in examples], dtype=torch.long)
+        batch['label_ids'] = [x['label_ids'] for x in examples]
         return batch
 
-    def prediction_step(batch: dict) -> tuple:
-        return trainer.prediction_step(trainer.model, inputs=batch, 
-            prediction_loss_only=False)
+    def prediction_step(model, batch: dict, max_gen_len: int) -> tuple:
+        # return trainer.prediction_step(trainer.model, inputs=batch, 
+            # prediction_loss_only=False)
+        output = model.generate(
+            input_ids=batch['input_ids'],
+            attention_mask=batch['attention_mask'],
+            max_length=max_gen_len,
+            do_sample=False,
+        )
+        return output
 
-    trainer.model.eval()
+    # tokenizer = trainer.tokenizer
+    # model = trainer.model
+    text_to_label = {text: i for i, text in enumerate(dataset.verbalizer)}
+    label_ids = tokenizer(dataset.verbalizer).input_ids
+    max_gen_len = max([len(x) for x in label_ids])
+    # trainer.model.eval()
+    model.eval()
     dataloader = DataLoader(dataset, batch_size=args.batch_size, collate_fn=collate_fn)
+    
+    print('*** Testing ***')
+    print(f'# examples: {len(dataset)}')
+    print(f'max_gen_len: {max_gen_len}')
+    print(f'verbalizer: {dataset.verbalizer}')
+
     total_loss = 0
     acc = 0
     num_steps = 0
     all_preds = []
     for batch in dataloader:
-        loss, logits, labels = prediction_step(batch)
-        logits = logits[0]
-        preds = torch.argmax(logits, dim=2)  # (N, seq_len, vocab_size) -> (N, seq_len)
-        all_preds += list(preds.cpu().numpy())
+        output_seqs = prediction_step(model, batch, max_gen_len)
+        # logits = logits[0]
+        # preds = torch.argmax(logits, dim=2)  # (N, seq_len, vocab_size) -> (N, seq_len)
+        # all_preds += list(preds.cpu().numpy())
 
-        total_loss += loss.item()
-        acc += get_test_acc(preds, labels)
+        output_texts = tokenizer.batch_decode(output_seqs, skip_special_tokens=True)
+        preds = [text_to_label(t) for t in output_texts]
+        all_preds += preds
+
+        # total_loss += loss.item()
+        acc += get_test_acc(preds, batch['label_ids'])
         num_steps += 1
 
     # Get result
     acc /= num_steps
-    loss = total_loss / num_steps
+    # loss = total_loss / num_steps
     result = {
         'acc': acc,
-        'loss': loss,
+        # 'loss': loss,
     }
     return all_preds, result
+
+
+def get_trainer(model, tokenizer, data_dir: Path, output_dir: Path, 
+                args: Namespace) -> Seq2SeqTrainer:
+    '''Return a huggingface Trainer instance.'''
+    kwargs = {'tokenizer': tokenizer, 'num_examples': args.num_examples}
+    train_dataset = get_dataset(data_dir, 'train', **kwargs)
+    eval_dataset = get_dataset(data_dir, 'dev', **kwargs)
+    print('verbalizer:', train_dataset.verbalizer)
+    utils.dump_json(train_dataset.verbalizer, output_dir / 'verbalizer.json')
+    print('# train examples:', len(train_dataset))
+    print('# eval examples:', len(eval_dataset))
+
+    # Hyperparameters
+    batch_size = args.batch_size
+    grad_acc_steps = args.grad_acc_steps
+    num_epochs = args.num_epochs
+    warmup_ratio = 0.1
+    lr = args.lr
+    
+    train_args = Seq2SeqTrainingArguments(
+        output_dir=output_dir,
+        overwrite_output_dir=True, # TODO: remove on release
+        do_train=True,
+        do_predict=True,
+        per_device_train_batch_size=batch_size,
+        per_device_eval_batch_size=batch_size,
+        gradient_accumulation_steps=grad_acc_steps,
+        # Move predictions to CPU often because vocab is very large.
+        eval_accumulation_steps=128,
+        evaluation_strategy='epoch',
+        save_strategy='epoch',
+        learning_rate=lr,
+        num_train_epochs=num_epochs,
+        lr_scheduler_type='linear',
+        optim='adafactor',
+        warmup_ratio=warmup_ratio,
+        report_to='none',
+        logging_first_step=True,
+        logging_steps=args.log_interval,
+        disable_tqdm=not args.tqdm,
+        fp16=args.fp16,
+        bf16=args.bf16,
+        seed=args.seed,
+    )
+    trainer = Seq2SeqTrainer(
+        model,
+        train_args,
+        train_dataset=train_dataset, 
+        eval_dataset=eval_dataset,
+    )
+    return trainer

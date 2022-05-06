@@ -1,9 +1,17 @@
 # data/**/*.json
 # data/**/*.tsv
 results
+results_0
+results_1
+results_zh_verbalizer
 wandb
 .DS_Store
 __pycache__
 slurm-*.out
 all_tsv
 data/afqmc/*
+data/autoasr
+data/keyboard
+
+
+table.tsv
