@@ -27,18 +27,12 @@ def test(trainer: Trainer, dataset: CMRC2018Dataset, output_dir: Path, desc: str
 def test_all(trainer: Trainer, data_dir: Path, output_dir: Path, tok_name: str):
     print('test_all', flush=True)
     trainer.load_best_model(output_dir)
-    for test_type in [
-        # 'clean',
-        'dev' 
-        # 'noisy1', 'noisy2', 'noisy3'
-        ]:
-        # examples_file = data_dir / f'cmrc2018_test_{test_type}.json'
-        examples_file = data_dir / 'cmrc2018_dev.json'
+    for test_type in ['clean', 'noisy1', 'noisy2', 'noisy3']:
+        examples_file = data_dir / f'cmrc2018_test_{test_type}.json'
         dataset = CMRC2018Dataset(trainer.tokenizer, examples_file, 
             has_labels=True, tok_name=tok_name)
-        test(trainer, dataset, 
-            output_dir=output_dir / f'test_{test_type}', 
-            desc=test_type)
+        test(trainer, dataset, output_dir=output_dir / f'test_{test_type}', 
+             desc=test_type)
 
 
 def main():
@@ -53,7 +47,7 @@ def main():
     tokenizer = BertTokenizer.from_pretrained(args.model_path)
     tok_name = args.model_path.split('/')[-1]
 
-
+    print(f'# params: {utils.get_param_count(model)}', flush=True)
 
     utils.set_seed(0)
     trainer = Trainer(model, tokenizer, args)

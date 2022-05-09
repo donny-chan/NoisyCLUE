@@ -10,7 +10,6 @@ from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 
 from data.afqmc import AfqmcSeq2SeqDataset
 import utils
-from tasks import afqmc
 import afqmc.utils_seq2seq as utils_seq2seq
 from arguments import parse_args
 
