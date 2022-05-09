@@ -96,7 +96,7 @@ def train(trainer: Trainer, args: Namespace):
 def test(trainer, tokenizer, data_dir):
     print('Preparing test data')
     for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
-        print('\nTesting phase:', test_phase)
+        print('\nTesting phase:', test_phase, flush=True)
         data = get_dataset(data_dir, test_phase, tokenizer=tokenizer)
         predict(trainer, data, output_dir / test_phase)
 
@@ -113,7 +113,7 @@ utils.dump_args(args, output_dir / 'train_args.json')
 # Model
 tokenizer = BertTokenizer.from_pretrained(args.model_path)
 model = BertForSequenceClassification.from_pretrained(args.model_path).cuda()
-print('# params:', utils.get_param_count(model))
+print('# params:', utils.get_param_count(model), flush=True)
 
 # Train
 trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)

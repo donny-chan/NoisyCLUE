@@ -7,7 +7,7 @@ from tqdm import tqdm
 import torch
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
-from transformers import get_linear_schedule_with_warmup
+from transformers import get_scheduler
 
 import utils
 from .data import CMRC2018Dataset
@@ -49,7 +49,8 @@ class Trainer:
         self.optimizer = AdamW(optimizer_grouped_parameters,
                           betas=(0.9, 0.98),  # according to RoBERTa paper
                           lr=lr)
-        self.scheduler = get_linear_schedule_with_warmup(
+        self.scheduler = get_scheduler(
+            'linear',
             self.optimizer, 
             num_warmup_steps=int(warmup_ratio * num_opt_steps),
             num_training_steps=num_opt_steps)
@@ -207,12 +208,14 @@ class Trainer:
                     # Backward
                     loss.backward()
                     self.optimizer.step()
+                    self.scheduler.step()
                     self.optimizer.zero_grad()
                 
                 # Results and log
                 if step % args.log_interval == 0:
                     state = {
                         'ep': ep + step / len(train_dataloader),
+                        'lr': self.scheduler.get_lr()[0],
                         'loss': loss.item(),
                         'time_elapsed': time.time() - start_time,
                     }

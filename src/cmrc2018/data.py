@@ -44,7 +44,7 @@ def get_data(
     return: `(examples, features)`
     '''
     data_dir = examples_file.parent
-    print('Loading examples...')
+    print('Loading examples...', flush=True)
     examples = read_squad_examples(
         examples_file, has_labels=has_labels, num_examples=num_examples)
     print(f'Loaded {len(examples)} examples.')
@@ -55,12 +55,13 @@ def get_data(
     features_cache = data_dir / '.cache' / f'features_{tok_name}_{examples_file.name}'
     features_cache.parent.mkdir(exist_ok=True, parents=True)
     if use_cache and features_cache.exists():
+        print('Loading features from cache...', flush=True)
         features = load_jsonl(features_cache)
     else:
-        print(f'Convering {len(examples)} examples to features')
+        print(f'Convering {len(examples)} examples to features', flush=True)
         features = convert_examples_to_features(
             examples, tokenizer, has_labels=has_labels)
-        print(f'Got {len(features)} features')
+        print(f'Got {len(features)} features', flush=True)
         dump_jsonl(features, features_cache)
     return examples, features
 

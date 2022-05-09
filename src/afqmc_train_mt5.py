@@ -65,11 +65,11 @@ utils.set_seed(args.seed)
 utils.dump_args(args, output_dir / 'train_args.json')
 
 # Get model
-print('Getting model')
+print('Getting model', flush=True)
 model = MT5ForConditionalGeneration.from_pretrained(args.model_path)
 print('Getting tokenizer')
 tokenizer = MT5Tokenizer.from_pretrained(args.model_path)
-print('# parameters:', utils.get_param_count(model))
+print('# parameters:', utils.get_param_count(model), flush=True)
 
 # Train and test
 trainer = utils_seq2seq.get_trainer(model, tokenizer, data_dir, output_dir, args)
