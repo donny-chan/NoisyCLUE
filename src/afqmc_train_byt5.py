@@ -5,12 +5,13 @@ import time
 from pathlib import Path
 from argparse import Namespace
 
-from transformers import MT5Tokenizer, MT5ForConditionalGeneration
+from transformers import T5ForConditionalGeneration, AutoTokenizer
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 
 from data.afqmc import AfqmcSeq2SeqDataset
 import utils
-import utils_seq2seq
+from tasks import afqmc
+import afqmc.utils_seq2seq as utils_seq2seq
 from arguments import parse_args
 
 
@@ -20,13 +21,13 @@ def train(trainer: Seq2SeqTrainer, args: Namespace):
         train_args['resume_from_checkpoint'] = True
     start_time = time.time()
     trainer.train(**train_args)
-    print('Training time:', time.time() - start_time)
+    time_elapsed = time.time() - start_time
+    print('Training time:', time_elapsed)
 
 
 def test(
     # trainer: Seq2SeqTrainer, 
-    model,
-    tokenizer,
+    model, tokenizer,
     dataset: AfqmcSeq2SeqDataset,
     output_dir: Path, args: Namespace):
     '''Perform prediction (test) on given dataset'''
@@ -39,19 +40,21 @@ def test(
     # Save
     output_dir.mkdir(exist_ok=True, parents=True)
     utils.dump_json(result, output_dir / 'result.json')
-    preds_text = [tokenizer.decode(ids) for ids in preds]  # (N, ), list of str
+    preds_text = [dataset.verbalizer[x] for x in preds]  # (N, ), list of str
     utils.dump_str(preds, output_dir / 'preds.txt')
     utils.dump_json(preds_text, output_dir / 'preds_text.json', indent=2)
 
 
 def test_all(
     # trainer: Seq2SeqTrainer, 
-    model,
+    model, 
     tokenizer, data_dir: Path):
+    '''Test all phases'''
     for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
-        start_time = time.time()
         print('\nTesting phase:', test_phase)
-        data = utils_seq2seq.get_dataset(data_dir, test_phase, tokenizer=tokenizer)
+        start_time = time.time()
+        data = utils_seq2seq.get_dataset(
+            data_dir, test_phase, tokenizer=tokenizer, num_examples=args.num_examples)
         # test(trainer, data, output_dir / test_phase, args)
         test(model, tokenizer, data, output_dir / test_phase, args)
         print('test_run_time:', time.time() - start_time)
@@ -65,11 +68,11 @@ utils.set_seed(args.seed)
 utils.dump_args(args, output_dir / 'train_args.json')
 
 # Get model
-model = MT5ForConditionalGeneration.from_pretrained(args.model_path)
-tokenizer = MT5Tokenizer.from_pretrained(args.model_path)
-print('# parameters:', utils.get_param_count(model))
+model = T5ForConditionalGeneration.from_pretrained(args.model_path)
+tokenizer = AutoTokenizer.from_pretrained(args.model_path)
+print('# params:', utils.get_param_count(model))
 
-# Train and test
+# Train
 trainer = utils_seq2seq.get_trainer(model, tokenizer, data_dir, output_dir, args)
 train(trainer, args)
 test_all(model, tokenizer, data_dir)

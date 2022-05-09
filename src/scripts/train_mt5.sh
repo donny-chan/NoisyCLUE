@@ -2,14 +2,16 @@
 #SBATCH -p rtx2080
 #SBATCH --nodes 1
 #SBATCH --gpus-per-node 1
-#SBATCH --job-name=mT5-balanced
+#SBATCH --job-name=mT5-k-au
 
 lr="2e-4"
-task="afqmc_balanced"
+task="afqmc_unbalanced"
+task_parent="autoasr"
+task_parent="keyboard"
 model_name="mt5-base"
 
-data_dir="../data/Keyboard/$task"
-output_dir="results/keyboard_$task/${model_name}_lr${lr}"
+data_dir="../data/${task_parent}/${task}"
+output_dir="results/${task_parent}/${task}/${model_name}_lr${lr}"
 num_gpus=1
 
 # Command
@@ -23,7 +25,8 @@ cmd+=" --num_epochs 10"
 cmd+=" --batch_size 16"
 cmd+=" --grad_acc_steps 16"
 cmd+=" --lr ${lr}"
-cmd+=" --resume_from_checkpoint"
+# cmd+=" --resume_from_checkpoint"
+# cmd+=" --num_examples 256"
 
 logfile="$output_dir/log.txt"
 mkdir -p $output_dir

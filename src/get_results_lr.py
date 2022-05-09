@@ -7,17 +7,20 @@ from metrics import get_bin_metrics
 from print_utils import print_table, dump_table
 
 
+task_parent = 'keyboard'
+# task_parent = 'autoasr'
 task = 'afqmc_balanced'
+# task = 'afqmc_unbalanced'
 
 # Changed labels from "non_equivalent" to "nonequivalent"
 results_dir = 'results_1'
-label_to_id = {
-    'nonequivalent</s>': 0, 
-    "eonequivalent</s>": 0,
-    'equivalent</s>': 1, 
-    'nquivalent</s><pad><pad><pad>': 1,
-    "equivalent</s><pad><pad><pad>" : 1,
-}
+# label_to_id = {
+#     'nonequivalent</s>': 0, 
+#     "eonequivalent</s>": 0,
+#     'equivalent</s>': 1, 
+#     'nquivalent</s><pad><pad><pad>': 1,
+#     "equivalent</s><pad><pad><pad>" : 1,
+# }
 
 # Chinese labels: ["不等价", "等价"]
 results_dir = 'results'
@@ -36,7 +39,7 @@ model_pattern = '*'
 
 
 def get_labels():
-    test_file = Path(f'../data/AutoASR/{task}/test_clean.json')
+    test_file = Path(f'../data/{task_parent}/{task}/test_clean.json')
     test_data = [json.loads(line) for line in test_file.open('r')]
     labels = [int(d['label']) for d in test_data]
     return labels
@@ -52,6 +55,9 @@ def get_acc(preds, labels) -> float:
 
 
 def get_preds(dir) -> list:
+    preds_file = dir / 'preds.txt'
+    if preds_file.exists():
+        return json.load(preds_file.open())
     try:
         preds_text_file = dir / 'preds_text.json'
         if preds_text_file.exists():
@@ -110,7 +116,6 @@ def get_result(result_dir, labels):
             preds = get_preds(dir / f'test_{data_name}')
             if preds == None:
                 continue
-            # print(dir, data_name)
             metrics = get_bin_metrics(labels, preds)
             if data_name == 'clean':
                 result['macro_f1_{}'.format(data_name)] = metrics.get('macro_f1', None)
@@ -127,7 +132,7 @@ def get_result(result_dir, labels):
 data_names = ['clean', 'noisy_1', 'noisy_2', 'noisy_3']
 test_names = [f'test_{x}' for x in data_names]
 labels = get_labels()
-results_dir = Path(results_dir) / task
+results_dir = Path(results_dir) / task_parent / task
 
 headers = {
     'model': str,
@@ -152,7 +157,8 @@ headers = list(headers.keys())
 
 print(f'Getting results from {results_dir}')
 rows = []
-for result_dir in sorted(results_dir.glob(model_pattern)):
+subdirs = sorted(d for d in results_dir.glob(model_pattern) if d.is_dir())
+for result_dir in subdirs:
     result = get_result(result_dir, labels)
     row = [result.get(h, None) for h in headers[1:]]
     row = [result_dir.name] + row
@@ -160,4 +166,4 @@ for result_dir in sorted(results_dir.glob(model_pattern)):
 
 headers = [h.replace('_', ' ') for h in headers]
 print_table(rows, headers, types)
-dump_table(rows, headers, types, 'table.tsv')
+dump_table(rows, headers, types, results_dir / 'table.tsv')

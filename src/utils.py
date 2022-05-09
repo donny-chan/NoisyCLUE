@@ -1,14 +1,11 @@
+# coding: utf8
 import json
 from argparse import Namespace
 from pathlib import Path
 import random
 
 import torch
-from torch.utils.data import DataLoader
 import numpy as np
-from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
-
-from data.afqmc import AfqmcDataset, AfqmcSeq2SeqDataset
 
 
 def set_seed(seed):
@@ -17,21 +14,42 @@ def set_seed(seed):
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
+def iter_jsonl(file):
+    for line in  open(file, 'r', encoding='utf8'):
+        yield json.loads(line.strip())
+
+def dump_jsonl(data, file: Path, **kwargs):
+    with open(file, 'w', encoding='utf8') as f:
+        for d in data:
+            f.write(json.dumps(d, ensure_ascii=False, **kwargs) + '\n')
+        
+
+def load_jsonl(file, cnt=None):
+    if cnt:
+        data = []
+        for line in open(file, 'r', encoding='utf8'):
+            data.append(json.loads(line))  
+            if len(data) == cnt:
+                break
+        return data
+    else:
+        return [json.loads(line) for line in open(file, 'r', encoding='utf8')]
+
+def dump_json(data, file: Path, **kwargs):
+    json.dump(data, open(file, 'w', encoding='utf8'), ensure_ascii=False, **kwargs)
+
+def load_json(file: Path):
+    return json.load(open(file, 'r', encoding='utf8'))
 
 def dump_str(data, file: Path):
     file.parent.mkdir(parents=True, exist_ok=True)
     with file.open('w') as f:
         f.write(str(data))
 
-
-def dump_args(args, file: Path):
+def dump_args(args: Namespace, file: Path):
     s = json.dumps(vars(args), indent=2, ensure_ascii=False)
     file.open('w').write(s)
     print(s)
-
-def dump_json(data, file: Path, **kwargs):
-    json.dump(data, file.open('w'), ensure_ascii=False, **kwargs)
-
 
 def get_acc(preds: np.array, labels: np.array) -> float:
     return np.mean(np.argmax(preds, axis=1) == labels)
@@ -39,11 +57,3 @@ def get_acc(preds: np.array, labels: np.array) -> float:
 
 def get_param_count(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
-
-
-def _get_dataset(file: Path, phase: str, **kwargs) -> AfqmcDataset:
-    return AfqmcDataset(file, phase, max_seq_len=512, **kwargs)
-
-
-def  get_dataset(data_dir: Path, phase: str, **kwargs) -> AfqmcDataset:
-    return _get_dataset(data_dir / f'{phase}.json', phase, **kwargs)

@@ -3,7 +3,7 @@ import os.path as osp
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from . import utils
+import utils
 
 
 def get_examples(file: str, set_type: str) -> list:
@@ -81,6 +81,7 @@ class AfqmcSeq2SeqDataset(Dataset):
         self.verbalizer = ['nonequivalent', 'equivalent']
         self.file = file
         self.tokenizer = tokenizer
+        self.phase = phase
 
         examples = get_examples(file, phase)[:num_examples]
         self.features = self.get_features(examples, tokenizer)
@@ -114,10 +115,16 @@ class AfqmcSeq2SeqDataset(Dataset):
         return inputs
 
     def __getitem__(self, idx):
-        return {
-            k: self.features[k][idx] for k in 
-            ['input_ids', 'attention_mask', 'labels', 'label_ids']
-        }
+        if 'test' in self.phase:
+            return {
+                k: self.features[k][idx] for k in 
+                ['input_ids', 'attention_mask', 'labels', 'label_ids']
+            }
+        else:
+            return {
+                k: self.features[k][idx] for k in 
+                ['input_ids', 'attention_mask', 'labels']
+            }
 
     def __len__(self):
         return len(self.features['input_ids'])

@@ -40,6 +40,7 @@ def print_table(rows, headers, types):
     print_hor_line()
 
 def dump_table(rows, headers, types, file):
+    file.parent.mkdir(exist_ok=True, parents=True)
     rows = [[to_str(x, t) for x, t in zip(row, types)] for row in rows]
     
     with open(file, 'w') as f:

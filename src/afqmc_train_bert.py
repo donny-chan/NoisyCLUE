@@ -8,9 +8,17 @@ from transformers import BertForSequenceClassification, BertTokenizer
 from transformers.trainer import Trainer, TrainingArguments
 import numpy as np
 
-from data.afqmc import AfqmcDataset
+from afqmc.data import AfqmcDataset
 import utils
 from arguments import parse_args
+
+
+def _get_dataset(file: Path, phase: str, **kwargs) -> AfqmcDataset:
+    return AfqmcDataset(file, phase, max_seq_len=512, **kwargs)
+
+
+def  get_dataset(data_dir: Path, phase: str, **kwargs) -> AfqmcDataset:
+    return _get_dataset(data_dir / f'{phase}.json', phase, **kwargs)
 
 
 def get_test_acc(preds: np.array, labels: np.array) -> float:
@@ -20,8 +28,8 @@ def get_test_acc(preds: np.array, labels: np.array) -> float:
 def get_trainer(model: BertForSequenceClassification, tokenizer: BertTokenizer,
                 data_dir: Path, output_dir: Path, args: Namespace) -> Trainer:
     kwargs = {'tokenizer': tokenizer, 'num_examples': args.num_examples}
-    train_dataset = utils.get_dataset(data_dir, 'train', **kwargs)
-    eval_dataset = utils.get_dataset(data_dir, 'dev', **kwargs)
+    train_dataset = get_dataset(data_dir, 'train', **kwargs)
+    eval_dataset = get_dataset(data_dir, 'dev', **kwargs)
     
     # Hyperparameters
     batch_size = args.batch_size
@@ -89,7 +97,7 @@ def test(trainer, tokenizer, data_dir):
     print('Preparing test data')
     for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
         print('\nTesting phase:', test_phase)
-        data = utils.get_dataset(data_dir, test_phase, tokenizer=tokenizer)
+        data = get_dataset(data_dir, test_phase, tokenizer=tokenizer)
         predict(trainer, data, output_dir / test_phase)
 
 

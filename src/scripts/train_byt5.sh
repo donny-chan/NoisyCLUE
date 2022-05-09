@@ -2,15 +2,16 @@
 #SBATCH -p rtx2080
 #SBATCH --nodes 1
 #SBATCH --gpus-per-node 1
-#SBATCH --job-name=byT5-balanced
+#SBATCH --job-name=byT5-k-au
 
 num_gpus=1
 lr="2e-4"
-task="afqmc_balanced"
+task="afqmc_unbalanced"
+task_parent="keyboard"
 model_name="byt5-base"
 
-output_dir="results/$task/${model_name}_lr${lr}"
-data_dir="../data/AutoASR/$task"
+output_dir="results/${task_parent}/${task}/${model_name}_lr${lr}"
+data_dir="../data/${task_parent}/${task}"
 
 # Command
 cmd="python3 train_byt5.py"

@@ -28,45 +28,37 @@ def predict(
     '''
     def get_test_acc(preds: torch.Tensor, labels: torch.Tensor) -> float:
         '''
-        preds: (#examples, seq_len)
-        labels: (#examples, seq_len)
+        preds: (#examples)
+        labels: (#examples)
         '''
-        assert preds.size() == labels.size()
-        eq = torch.eq(preds, labels)
+        assert len(preds) == len(labels)
         count = len(labels)
         correct = 0
         for i in range(count):
-            if eq[i].all():
+            if preds[i] == labels[i]:
                 correct += 1
         return correct / count
-
-    def collate_fn(examples: list):
-        '''Each element in `examples` is a dict {str: list}.'''
-        batch = {}
-        for key in ['input_ids', 'attention_mask']:
-            batch[key] = torch.tensor([x[key] for x in examples], dtype=torch.long)
-        batch['label_ids'] = [x['label_ids'] for x in examples]
-        return batch
 
     def prediction_step(model, batch: dict, max_gen_len: int) -> tuple:
         # return trainer.prediction_step(trainer.model, inputs=batch, 
             # prediction_loss_only=False)
         output = model.generate(
-            input_ids=batch['input_ids'],
-            attention_mask=batch['attention_mask'],
+            input_ids=batch['input_ids'].cuda(),
+            attention_mask=batch['attention_mask'].cuda(),
             max_length=max_gen_len,
             do_sample=False,
         )
         return output
 
-    # tokenizer = trainer.tokenizer
-    # model = trainer.model
     text_to_label = {text: i for i, text in enumerate(dataset.verbalizer)}
     label_ids = tokenizer(dataset.verbalizer).input_ids
     max_gen_len = max([len(x) for x in label_ids])
-    # trainer.model.eval()
     model.eval()
-    dataloader = DataLoader(dataset, batch_size=args.batch_size, collate_fn=collate_fn)
+    dataloader = DataLoader(
+        dataset, 
+        batch_size=args.batch_size, 
+        # collate_fn=collate_fn
+    )
     
     print('*** Testing ***')
     print(f'# examples: {len(dataset)}')
@@ -79,15 +71,19 @@ def predict(
     all_preds = []
     for batch in dataloader:
         output_seqs = prediction_step(model, batch, max_gen_len)
-        # logits = logits[0]
-        # preds = torch.argmax(logits, dim=2)  # (N, seq_len, vocab_size) -> (N, seq_len)
-        # all_preds += list(preds.cpu().numpy())
 
         output_texts = tokenizer.batch_decode(output_seqs, skip_special_tokens=True)
-        preds = [text_to_label(t) for t in output_texts]
+        for t in output_texts:
+            if t not in text_to_label:
+                print(output_texts)
+                print(text_to_label)
+                exit()
+        preds = [text_to_label[t] for t in output_texts]
         all_preds += preds
 
         # total_loss += loss.item()
+        # print(batch)
+        # label_ids = [x['label_ids'] for x in batch]
         acc += get_test_acc(preds, batch['label_ids'])
         num_steps += 1
 
