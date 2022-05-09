@@ -14,6 +14,9 @@ from .data import CMRC2018Dataset
 from .evaluate import write_predictions, Logits, get_metrics
 
 
+def log(*args, **kwargs):
+    print(*args, **kwargs, flush=True)
+
 class Trainer:
     def __init__(self, model: torch.nn.Module, tokenizer, args: argparse.Namespace):
         """Initialize a models, tokenizer and config."""
@@ -114,10 +117,10 @@ class Trainer:
         all_unique_ids = []
 
         start_time = time.time()
-        print(f'*** Start {desc} ***')
-        print(f'Batch size: {self.args.batch_size}')
-        print(f'# features: {num_features}')
-        print(f'# steps: {num_steps}')
+        log(f'*** Start {desc} ***')
+        log(f'Batch size: {self.args.batch_size}')
+        log(f'# features: {num_features}')
+        log(f'# steps: {num_steps}')
 
         for step, batch in enumerate(dataloader):
             with torch.no_grad():
@@ -134,7 +137,7 @@ class Trainer:
 
         time_elapsed = time.time() - start_time
 
-        print(f'*** End {desc} ***')
+        log(f'*** End {desc} ***')
 
         all_logits = [
             Logits(
@@ -189,15 +192,16 @@ class Trainer:
 
         start_time = time.time()
 
-        print('*** Start training ***')
-        print(f'Batch size: {args.batch_size}')
-        print(f'# train examples: {len(train_dataset)}')
-        print(f'# val examples: {len(val_dataset)}')
-        print(f'# epochs: {args.num_epochs}')
-        print(f'# steps: {num_steps}', flush=True)
+        log('*** Start training ***')
+        log(f'Batch size: {args.batch_size}')
+        log(f'# train examples: {len(train_dataset)}')
+        log(f'# val examples: {len(val_dataset)}')
+        log(f'# epochs: {args.num_epochs}')
+        log(f'# steps: {num_steps}')
 
         for ep in range(args.num_epochs):
             self.model.train()
+            self.model.zero_grad()
             for step, batch in enumerate(train_dataloader):
                 # Forward
                 loss = self.train_step(batch)
@@ -215,11 +219,11 @@ class Trainer:
                 if step % args.log_interval == 0:
                     state = {
                         'ep': ep + step / len(train_dataloader),
-                        'lr': self.scheduler.get_lr()[0],
+                        'lr': self.scheduler.get_last_lr()[0],
                         'loss': loss.item(),
                         'time_elapsed': time.time() - start_time,
                     }
-                    print(state, flush=True)
+                    log(state)
             
             # validation
             with torch.no_grad():
@@ -231,19 +235,19 @@ class Trainer:
                     desc="Validation")
                 result = eval_output['result']
                 preds = eval_output['preds']
-                print('result:', result)
+                log('result:', result)
 
                 # Save checkpoint and results
                 self.save_checkpoint(checkpoint_dir)
                 utils.dump_json(result, checkpoint_dir / f'eval_result.json')
                 utils.dump_json(preds, checkpoint_dir / f'preds.json')
 
-        print(f'*** End training ***')
+        log(f'*** End training ***')
         result = {
             'avg_loss': sum(all_train_loss) / total_steps,
             'time_elapsed': time.time() - start_time,
         }
-        print('result:', result, '\n')
+        log('result:', result, '\n')
 
     def save_checkpoint(self, output_dir: Path):
         '''
@@ -268,7 +272,7 @@ class Trainer:
         Load best model (by validation loss) from output_dir,
         Return the model (just a syntax-sugar)
         '''
-        print('Loading best checkpoint')
+        log('Loading best checkpoint')
         best_checkpoint_dir = None
         min_eval_loss = 1e9
         for checkpoint_dir in sorted(output_dir.glob('checkpoint-*')):
@@ -280,6 +284,6 @@ class Trainer:
                 best_checkpoint_dir = checkpoint_dir
 
         best_checkpoint_file = best_checkpoint_dir / 'pytorch_model.bin'
-        print(f'Best checkpoint: {best_checkpoint_file}')
+        log(f'Best checkpoint: {best_checkpoint_file}')
         self.load_model(best_checkpoint_file)
         return self.model

@@ -43,26 +43,38 @@ def get_data(
     Get examples, convert to features.
     return: `(examples, features)`
     '''
+    def log(*args, **kwargs): 
+        print(*args, **kwargs, flush=True)
+
+    def load_features_cache(file: Path) -> List[dict]:
+        features = load_jsonl(file)
+        # Convert str keys to int
+        for i, f in enumerate(features):
+            for key in ['token_to_orig_map', 'token_is_max_context']:
+                features[i][key] = {int(k): v for k, v in f[key].items()}
+        return features
+
     data_dir = examples_file.parent
-    print('Loading examples...', flush=True)
+    log('Loading examples...')
     examples = read_squad_examples(
         examples_file, has_labels=has_labels, num_examples=num_examples)
-    print(f'Loaded {len(examples)} examples.')
+    log(f'Loaded {len(examples)} examples.')
 
     # Get features (load cache or convert from examples)
     if num_examples:
         tok_name = f'{num_examples}_{tok_name}'
     features_cache = data_dir / '.cache' / f'features_{tok_name}_{examples_file.name}'
     features_cache.parent.mkdir(exist_ok=True, parents=True)
+
     if use_cache and features_cache.exists():
-        print('Loading features from cache...', flush=True)
-        features = load_jsonl(features_cache)
+        log('Loading features from cache...')
+        features = load_features_cache(features_cache)
     else:
-        print(f'Convering {len(examples)} examples to features', flush=True)
+        log(f'Converting {len(examples)} examples to features')
         features = convert_examples_to_features(
             examples, tokenizer, has_labels=has_labels)
-        print(f'Got {len(features)} features', flush=True)
         dump_jsonl(features, features_cache)
+    log(f'Got {len(features)} features')
     return examples, features
 
 

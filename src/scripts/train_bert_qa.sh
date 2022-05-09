@@ -1,14 +1,14 @@
 #!/bin/bash
 #SBATCH -p rtx2080
 #SBATCH -G 1
-#SBATCH --job-name cmrc-rb
+#SBATCH --job-name cmrc-mb
 
 model_path="chinese-roberta-wwm-ext"
 model_path="chinese-macbert-base"
 task="cmrc2018"
 task_parent="keyboard"
 # task_parent="autoasr"
-lr="1e-4"
+lr="5e-4"
 
 output_dir="results/${task_parent}/${task}/${model_path}_lr${lr}"
 data_dir="../data/${task_parent}/${task}"
