@@ -19,7 +19,7 @@ def test(trainer: Trainer, dataset: CMRC2018Dataset, output_dir: Path, desc: str
     # Save results
     result = eval_output['result']
     preds = eval_output['preds']
-    print(result)
+    print(result, flush=True)
     utils.dump_json(result, output_dir / 'result.json')
     utils.dump_json(preds, output_dir / 'preds.json')
 
@@ -27,7 +27,7 @@ def test(trainer: Trainer, dataset: CMRC2018Dataset, output_dir: Path, desc: str
 def test_all(trainer: Trainer, data_dir: Path, output_dir: Path, tok_name: str):
     print('test_all', flush=True)
     trainer.load_best_model(output_dir)
-    for test_type in ['clean', 'noisy1', 'noisy2', 'noisy3']:
+    for test_type in ['clean', 'noisy_1', 'noisy_2', 'noisy_3']:
         examples_file = data_dir / f'cmrc2018_test_{test_type}.json'
         dataset = CMRC2018Dataset(trainer.tokenizer, examples_file, 
             has_labels=True, tok_name=tok_name)

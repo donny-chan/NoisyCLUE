@@ -11,6 +11,7 @@ task_parent = 'keyboard'
 # task_parent = 'autoasr'
 task = 'afqmc_balanced'
 # task = 'afqmc_unbalanced'
+# task = 'cmrc2018'
 
 # Changed labels from "non_equivalent" to "nonequivalent"
 results_dir = 'results_1'
@@ -24,18 +25,8 @@ results_dir = 'results_1'
 
 # Chinese labels: ["不等价", "等价"]
 results_dir = 'results'
-# results_dir = 'results_zh_verbalizer'
-# label_to_id = {
-#     "不等价</s>": 0,
-#     "等等价</s>": 0,
-#     "等价</s> <pad>": 1,
-# }
-
-# results_dir = 'results_0'
-# label_to_id = {'non_equivalent</s>': 0, 'equivalent</s> <pad>': 1}
 
 model_pattern = '*'
-# model_pattern = 'mt5-base_lr*'
 
 
 def get_labels():

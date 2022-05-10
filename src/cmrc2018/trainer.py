@@ -9,6 +9,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 from transformers import get_scheduler
 
+from trainer import get_adamw, get_linear_scheduler
 import utils
 from .data import CMRC2018Dataset
 from .evaluate import write_predictions, Logits, get_metrics
@@ -32,31 +33,14 @@ class Trainer:
 
     def configure_optimizers(
         self, 
-        num_opt_steps: int,
         lr: float,
+        num_opt_steps: int,
+        weight_decay: float=0.01,
         warmup_ratio: float=0.1, 
-        weight_decay: float=0.01):
-        """Prepare optimizer and schedule (linear warmup and decay)"""
-        model = self.model
-        no_decay = ["bias", "LayerNorm.weight"]
-        optimizer_grouped_parameters = [
-            {
-                "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": weight_decay,
-            },
-            {
-                "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
-                "weight_decay": 0.0,
-            },
-        ]
-        self.optimizer = AdamW(optimizer_grouped_parameters,
-                          betas=(0.9, 0.98),  # according to RoBERTa paper
-                          lr=lr)
-        self.scheduler = get_scheduler(
-            'linear',
-            self.optimizer, 
-            num_warmup_steps=int(warmup_ratio * num_opt_steps),
-            num_training_steps=num_opt_steps)
+        ):
+        self.optimizer = get_adamw(self.model, lr, weight_decay)
+        self.scheduler = get_linear_scheduler(
+            self.optimizer, warmup_ratio, num_opt_steps)
 
     def train_step(self, batch: dict) -> torch.nn.Module:
         '''

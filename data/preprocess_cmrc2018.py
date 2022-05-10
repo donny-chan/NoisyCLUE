@@ -5,7 +5,7 @@ from utils import load_jsonl
 data_dir = Path('keyboard/cmrc2018')
 examples = load_jsonl(data_dir / 'cmrc2018_test.json')
 
-for test_type in ['clean', 'noisy1', 'noisy2', 'noisy3']:
+for test_type in ['clean', 'noisy_1', 'noisy_2', 'noisy_3']:
     dst_file = data_dir / f'cmrc2018_test_{test_type}.json'
     print(f'Saving to {dst_file}')
     with open(dst_file, 'w') as f:
