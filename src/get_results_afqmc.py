@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 from collections import defaultdict
 
-from metrics import get_bin_metrics
+from afqmc.metrics import get_bin_metrics
 
 from print_utils import print_table, dump_table
 
