@@ -23,3 +23,8 @@ wandb
 .DS_Store
 __pycache__
 .vscode
+
+# Temporary file
+file.txt
+preds.json
+labels.json
