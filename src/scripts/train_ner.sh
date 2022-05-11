@@ -8,7 +8,7 @@ model_path="chinese-macbert-base"
 task="cluener"
 task_parent="keyboard"
 # task_parent="autoasr"
-lr="2e-4"
+lr="5e-5"
 
 output_dir="results/${task_parent}/${task}/${model_path}_lr${lr}"
 data_dir="../data/${task_parent}/${task}"

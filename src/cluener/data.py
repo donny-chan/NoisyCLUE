@@ -35,8 +35,10 @@ class CluenerDataset(Dataset):
         return self.processor.get_label_list()
 
     def get_features(self, examples) -> List[dict]:
-        return self.processor.convert_examples_to_features(
+        features = self.processor.convert_examples_to_features(
             examples, self.tokenizer, 512)
+        print('features labels:', features['labels'][:2])
+        return features
 
     def __getitem__(self, idx: int) -> dict:
         keys = ['input_ids', 'token_type_ids', 'attention_mask', 'labels']

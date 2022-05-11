@@ -243,7 +243,7 @@ class Trainer:
         torch.save(self.optimizer, output_dir / 'optimizer.pt')
         torch.save(self.model.state_dict(), output_dir / 'pytorch_model.bin')
         torch.save(torch.cuda.get_rng_state(), output_dir / 'rng_state.pth')
-        # torch.save(self.scheduler, output_dir / 'scheduler.pt')
+        torch.save(self.scheduler.state_dict(), output_dir / 'scheduler.pt')
         # utils.dump_json(self.args, output_dir / 'training_args')
 
     def load_model(self, file: Path):

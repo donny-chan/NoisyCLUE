@@ -37,8 +37,11 @@ class CluenerProcessor:
         label_to_id = {label: i for i, label in enumerate(self.get_label_list())}
         return [[label_to_id[name] for name in x.labels] for x in examples]
 
-    def tokenize_and_align_labels(self, examples: List[Example],
-        tokenizer, max_length) -> Dict[str, List[int]]:
+    def tokenize_and_align_labels(self, 
+        examples: List[Example], 
+        tokenizer, 
+        max_length: int) -> Dict[str, List[int]]:
+        '''Tokenize and align labels'''
         orig_labels = self.get_label_ids(examples)
 
         atoms = [list(x.text) for x in examples] # List of lists of atomictokens.
@@ -93,15 +96,19 @@ class CluenerProcessor:
                         for raw_lo, raw_hi in pos:
                             for offset in range(-3, 4):  # Check different offsets to acount for wrong labels
                                 lo = raw_lo + offset
-                                hi = raw_lo + offset
+                                hi = raw_hi + offset
                                 if ''.join(text[lo:hi + 1]) != label_name:
                                     # raise ValueError(f"Label name {label_name} does not match text {''.join(text[lo:hi+1])}")
                                     continue
                                 if lo == hi:
                                     labels[lo] = f'S-{label_type}'
+                                    break
                                 else:
                                     labels[lo] = f'B-{label_type}'
                                     labels[lo + 1:hi + 1] = [f'I-{label_type}'] * (len(label_name) - 1)
+                                    break
+                            else:
+                                raise ValueError(f'Label name {label_name} not found in text {"".join(text)}')
             examples.append(Example(
                 guid=phase + '-' + line['id'], 
                 text=text, 

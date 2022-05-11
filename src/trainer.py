@@ -1,6 +1,5 @@
 from pathlib import Path
 from argparse import Namespace
-from typing import Any
 from time import time
 
 import torch
@@ -9,7 +8,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader, Dataset
 from transformers import get_scheduler
 
-from utils import dump_args, get_param_count, dump_json, load_json
+from utils import get_param_count, dump_json, load_json
 
 
 def get_adamw(model: Module,lr: float, weight_decay: float) -> AdamW:
@@ -28,7 +27,8 @@ def get_adamw(model: Module,lr: float, weight_decay: float) -> AdamW:
     optimizer = AdamW(
         optimizer_grouped_parameters,
         betas=(0.9, 0.98),  # according to RoBERTa paper
-        lr=lr)
+        lr=lr,
+        eps=1e-8)
     return optimizer
 
 
@@ -87,6 +87,14 @@ class TrainArgs:
 
 
 class Trainer:
+    '''
+    Simple trainer that supports:
+    - Easy interface for training and evaluating any model
+    - saving and resuming.
+    '''
+    LAST_EPOCH_FILE = 'last_epoch.txt'
+    TRAIN_LOG_FILE = 'train.log'
+
     def log(self, *args, **kwargs):
         print(*args, **kwargs, flush=True)
         print(*args, **kwargs, file=self.train_log_writer, flush=True)
@@ -110,10 +118,24 @@ class Trainer:
         self.lr = lr
         self.setup_output_dir()
 
+    def train_log(self, cur_loss):
+        '''Called every `log_interval` steps during training.'''
+        state = {
+            'ep': self.cur_train_step / len(self.train_dataloader),
+            'lr': self.scheduler.get_last_lr()[0],
+            'loss': cur_loss.item(),
+            'time_elapsed': time() - self.train_start_time,
+        }
+        self.log(state)
+
     def setup_output_dir(self):
-        print('Setting up output dir...', flush=True)
+        self.output_dir.mkdir(exist_ok=True, parents=True)
         self.train_log_writer = open(
-            self.output_dir / 'train.log', 'w', encoding='utf8')
+            self.output_dir / self.TRAIN_LOG_FILE, 'w', encoding='utf8')
+        self.log('--------- Training args:')
+        for key in ['output_dir', 'batch_size', 'num_epochs', 'grad_acc_steps', 'log_interval', 'lr']:
+            self.log(f'{key:>16}: {getattr(self, key)}')
+        self.log('---------')
 
     def setup_optimizer_and_scheuler(
         self, 
@@ -125,14 +147,38 @@ class Trainer:
         Setup optimizer and scheduler.
         Will set `self.optimizer` and `self.scheduler`.
         '''
+        self.log(f'Setting up optimizer and scheduler...')
         self.optimizer = get_adamw(self.model, lr, weight_decay)
         self.scheduler = get_linear_scheduler(
             self.optimizer, warmup_ratio, num_opt_steps)
+
+    def get_last_epoch_file(self):
+        return self.output_dir / self.LAST_EPOCH_FILE
+
+    def load_last_epoch(self):
+        return int(open(self.get_last_epoch_file(), 'r').read())
+
+    def can_resume(self):
+        return self.get_last_epoch_file().exists()
+
+    def validate(self, dev_dataset):
+        '''
+        Call this on validation, NOT on test!
+        
+        Will output results to checkpoint dir.
+        '''
+        checkpoint_dir = self.output_dir / f'checkpoint-{self.cur_epoch}'
+        eval_output = self.evaluate(dev_dataset, 'dev', checkpoint_dir)
+        result = eval_output['result']
+        preds = eval_output['preds']
+        dump_json(result, checkpoint_dir / f'eval_result.json')
+        dump_json(preds, checkpoint_dir / f'preds.json')
 
     def train(
         self, 
         train_dataset: Dataset, 
         dev_dataset: Dataset,
+        resume: bool=True,
         ):
         train_dataloader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
 
@@ -140,11 +186,18 @@ class Trainer:
         num_opt_steps = len(train_dataloader) // self.grad_acc_steps * self.num_epochs
         self.setup_optimizer_and_scheuler(self.lr, num_opt_steps)
 
-        self.global_cur_step = 0
-        self.train_start_time = time()
+        # Handle resumption
+        if resume and self.can_resume():
+            self.resume()
+            self.validate(dev_dataset)
+            self.cur_epoch += 1
+        else:
+            self.cur_epoch = 0
+            self.cur_train_step = 0
+            self.train_start_time = time()
 
         self.log(f'# params {get_param_count(self.model)}')
-        self.log('*** Start training ***')
+        self.log('\n*** Start training ***')
         self.log(f'batch size: {self.batch_size}')
         self.log(f'# grad acc steps: {self.grad_acc_steps}')
         self.log(f'# opt steps: {num_opt_steps}')
@@ -153,18 +206,11 @@ class Trainer:
         self.log(f'# train steps: {len(train_dataloader)}')
         self.log(f'# dev features: {len(dev_dataset)}')
 
-        for ep in range(self.num_epochs):
-            # Learn
-            self.train_epoch(train_dataloader, ep)
-
-            # Validate
-            checkpoint_dir = self.output_dir / f'checkpoint-{ep}'
-            eval_output = self.evaluate(dev_dataset, 'dev', checkpoint_dir)
-            self.save_checkpoint(checkpoint_dir)
-            result = eval_output['result']
-            preds = eval_output['preds']
-            dump_json(result, checkpoint_dir / f'eval_result.json')
-            dump_json(preds, checkpoint_dir / f'preds.json')
+        while self.cur_epoch < self.num_epochs:
+            self.train_epoch(train_dataloader)
+            self.save_checkpoint()
+            self.validate(dev_dataset)
+            self.cur_epoch += 1
 
         self.log('*** End training ***')
         return self.get_train_result()
@@ -174,13 +220,13 @@ class Trainer:
             'time_elapsed': time() - self.train_start_time,
         }
 
-    def train_epoch(self, dataloader: DataLoader, epoch: int):
+    def train_epoch(self, dataloader: DataLoader):
         self.train_dataloader = dataloader
         self.model.train()
-        print(f'*** Start training epoch {epoch} ***', flush=True)
+        self.log(f'*** Start training epoch {self.cur_epoch} ***')
         for step, batch in enumerate(dataloader):
             self.train_step(step, batch)
-        print(f'*** End training epoch {epoch} ***', flush=True)
+        self.log(f'*** End training epoch {self.cur_epoch} ***')
 
     def eval_loop(self,
         dataset: Dataset,
@@ -190,6 +236,7 @@ class Trainer:
 
         self.model.eval()
         self.eval_start_time = time()
+        self.num_eval_steps = len(dataloader)
 
         self.log(f'*** Start evaluating {desc} ***')
         self.log(f'# features: {len(dataset)}')
@@ -197,47 +244,95 @@ class Trainer:
 
         for step, batch in enumerate(dataloader):
             self.eval_step(step, batch)
+
         
         self.log(f'*** Done evaluating {desc} ***')
         
         self.eval_end_time = time()
         self.eval_time_elapsed = self.eval_end_time - self.eval_start_time
 
-    def save_checkpoint(self, output_dir: Path):
-        torch.save(self.optimizer, output_dir / 'optimizer.pt')
-        torch.save(self.model.state_dict(), output_dir / 'pytorch_model.bin')
-        torch.save(torch.cuda.get_rng_state(), output_dir / 'rng_state.pth')
+    def save_checkpoint(self):
+        '''Save checkpoint'''
+        ckpt_dir = self.output_dir / f'checkpoint-{self.cur_epoch}'
+        self.log(f'*** Saving checkpoint to {ckpt_dir} ***')
+        ckpt_dir.mkdir(exist_ok=True, parents=True)
+        torch.save(self.model.state_dict(), ckpt_dir / 'pytorch_model.bin')
+        ckpt = {
+            'cur_epoch': self.cur_epoch,
+            'global_cur_step': self.cur_train_step,
+            'optimizer': self.optimizer.state_dict(),
+            'scheduler': self.scheduler.state_dict(),
+            'train_elapsed': time() - self.train_start_time,
+        }
+        torch.save(ckpt, ckpt_dir / 'ckpt.bin')
+        last_epoch_file = self.output_dir / self.LAST_EPOCH_FILE
+        open(last_epoch_file, 'w').write(str(self.cur_epoch))
+        self.log(f'*** Done saving checkpoint to {ckpt_dir} ***')
     
     def load_model(self, file: Path):
         '''Load model from file'''
         state_dict = torch.load(file, map_location='cpu')
         self.model.load_state_dict(state_dict)
 
-    def load_best_checkpoint(self):
+    def load_ckpt(self, checkpoint_dir: Path):
+        '''Load checkpoint'''
+        self.log(f'*** Loading checkpoint from {checkpoint_dir} ***')
+        self.load_model(checkpoint_dir / 'pytorch_model.bin')
+        ckpt = torch.load(checkpoint_dir / 'ckpt.bin')
+
+        self.scheduler.load_state_dict(ckpt['scheduler'])
+        self.optimizer.load_state_dict(ckpt['optimizer'])
+        self.train_start_time = time() - ckpt['train_elapsed']
+        self.cur_epoch = ckpt['cur_epoch']
+        self.cur_train_step = ckpt['global_cur_step']
+        self.log(f'*** Done loading checkpoint from {checkpoint_dir} ***')
+
+    def load_best_ckpt(self):
         '''Load best checkpoint in `self.output_dir` by dev loss'''
         min_loss = float('inf')
-        best_checkpoint_dir = None
-        for checkpoint_dir in sorted(self.output_dir.glob('checkpoint-*')):
-            if not checkpoint_dir.is_dir():
+        best_ckpt_dir = None
+        for ckpt_dir in sorted(self.output_dir.glob('checkpoint-*')):
+            if not ckpt_dir.is_dir():
                 continue
-            result_file = checkpoint_dir / 'eval_result.json'
+            result_file = ckpt_dir / 'eval_result.json'
             if not result_file.exists():
                 continue
             result = load_json(result_file)
             loss = result['loss']
             if loss < min_loss:
                 min_loss = loss
-                best_checkpoint_dir = checkpoint_dir
-        best_model_file = best_checkpoint_dir / 'pytorch_model.bin'
-        self.log(f'Best model: {best_model_file}')
-        self.load_model(best_model_file)
+                best_ckpt_dir = ckpt_dir
+        self.load_ckpt(best_ckpt_dir)
+
+    def resume(self):
+        '''Resume training from last checkpoint'''
+        self.log(f'*** Resuming training from last checkpoint ***')
+        self.cur_epoch = self.load_last_epoch()
+        self.load_ckpt(self.output_dir / f'checkpoint-{self.cur_epoch}')
+        self.log(f'*** Resumed training from end of epoch {self.cur_epoch} ***')
 
     '''
     Below are virtual functions required to implement
     '''
 
     def train_step(self, step: int, batch: dict):
-        raise NotImplementedError
+        self.cur_train_step += 1
+
+        # Forward
+        outputs = self.model(**batch)
+        loss = outputs.loss
+
+        # Backward
+        if self.cur_train_step % self.grad_acc_steps == 0:
+            loss.backward()
+            self.optimizer.step()
+            self.scheduler.step()
+            self.optimizer.zero_grad()
+
+        # Log
+        if self.cur_train_step % self.log_interval == 0:
+            self.train_log(loss)
+
 
     def eval_step(self, step: int, batch: dict):
         raise NotImplementedError

@@ -5,11 +5,12 @@ from transformers import BertTokenizerFast, BertForTokenClassification, BertConf
 from cluener.trainer import CluenerTrainer
 from cluener.data import CluenerDataset
 from arguments import parse_args
-from utils import dump_args, get_param_count
+from utils import dump_args
 
 
-def get_dataset(tokenizer, data_dir, phase):
-    return CluenerDataset(tokenizer, data_dir / f'ner_{phase}.json', phase)
+def get_dataset(tokenizer, data_dir, phase, **kwargs):
+    # kwargs['num_examples'] = 1024
+    return CluenerDataset(tokenizer, data_dir / f'ner_{phase}.json', phase, **kwargs)
 
 
 def train(trainer: CluenerTrainer, tokenizer, args):
@@ -24,7 +25,7 @@ def test(trainer, dataset: CluenerDataset, desc: str) -> dict:
 
 
 def test_all(trainer: CluenerTrainer, tokenizer, args):
-    trainer.load_best_checkpoint()
+    trainer.load_best_ckpt()
     data_dir = Path(args.data_dir)
     for test_phase in ['clean', 'noisy_1', 'noisy_2', 'noisy_3']:
         print(f'testing: {test_phase}', flush=True)
@@ -43,8 +44,6 @@ def main():
     config.num_labels = 32
     model = BertForTokenClassification.from_pretrained(args.model_path, config=config)
     tokenizer = BertTokenizerFast.from_pretrained(args.model_path)
-    # print(model)
-    print(f'# params: {get_param_count(model)}', flush=True)
     
     trainer = CluenerTrainer(
         model, 

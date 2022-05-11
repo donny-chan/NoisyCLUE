@@ -1,18 +1,24 @@
-# data/**/*.json
-# data/**/*.tsv
+# Result
 results
 results_0
 results_1
 results_zh_verbalizer
-wandb
-.DS_Store
-__pycache__
-slurm-*.out
+table.tsv
+
+# Data
+
+
+# Task data
 all_tsv
 data/afqmc/*
 # data/autoasr
 data/keyboard
+data/un-parallel
+data/en-zh
 
-
-table.tsv
+# Others
+slurm-*.out
+wandb
+.DS_Store
+__pycache__
 .vscode
