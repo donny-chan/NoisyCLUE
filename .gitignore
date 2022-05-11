@@ -15,6 +15,7 @@ data/afqmc/*
 data/keyboard
 data/un-parallel
 data/en-zh
+src/un_parallel/*.json
 
 # Others
 slurm-*.out
