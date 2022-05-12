@@ -8,7 +8,9 @@ from transformers import (
     Seq2SeqTrainingArguments, 
     Seq2SeqTrainer,
 )
+from transformers.optimization import Adafactor, AdafactorSchedule
 
+from trainer import Trainer
 from un_parallel.data import UNParallelEnZhDataset, UNParallelZhEnIterableDataset
 from arguments import parse_args
 from utils import dump_args
@@ -52,8 +54,8 @@ def get_datasets(tokenizer, data_dir):
 
 
 def get_iterable_datasets():
-    train_dataset = UNParallelZhEnIterableDataset('un_parallel/features.json', cache_size=2**12)
-    dev_dataset = UNParallelZhEnIterableDataset('un_parallel/dev.json', cache_size=2**12)
+    train_dataset = UNParallelZhEnIterableDataset('un_parallel/features.json', cache_size=2**12, num_examples=15886041)
+    dev_dataset = UNParallelZhEnIterableDataset('un_parallel/dev.json', cache_size=2**12, num_examples=10000)
     return train_dataset, dev_dataset
 
 
@@ -71,10 +73,11 @@ def get_trainer(model, tokenizer, data_dir, output_dir, args):
         eval_steps=100,
         save_strategy='steps',
         save_steps=500,
-        max_steps=500000,
+        max_steps=100000,
         report_to='none',
-        logging_steps=1,
+        logging_steps=args.log_interval,
         optim='adafactor',
+        lr_scheduler_type='constant',
         learning_rate=args.lr,
         per_device_train_batch_size=args.batch_size,
         per_device_eval_batch_size=args.batch_size,
@@ -95,6 +98,24 @@ def get_trainer(model, tokenizer, data_dir, output_dir, args):
     return trainer
 
 
+def train(model, output_dir, args):
+    log('train')
+    log('Getting datasets')
+    train_dataset, dev_dataset = get_iterable_datasets()
+
+    trainer = Trainer(
+        model,
+        output_dir,
+        lr=1e-4,
+        eval_interval=20,
+        eval_strategy='step',
+    )
+
+    trainer.train(train_dataset, dev_dataset, resume=False)
+
+
+
+
 data_dir = Path('../data/un-parallel/en-zh')
 
 # log('Building tokenizer...')
@@ -103,5 +124,9 @@ tokenizer = None
 log('Building model...')
 model = AutoModelForSeq2SeqLM.from_pretrained(args.model_path)
 
-trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
-trainer.train()
+# trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
+# trainer.train()
+
+
+train(model, output_dir, args)
+

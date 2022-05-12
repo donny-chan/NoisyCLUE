@@ -20,7 +20,7 @@ cmd+=" --num_epochs 10"
 cmd+=" --batch_size 4"
 cmd+=" --grad_acc_steps 64"
 cmd+=" --lr $lr"
-cmd+=" --log_interval 40"
+cmd+=" --log_interval 1"
 # cmd+=" --resume_from_checkpoint"
 
 logfile="$output_dir/log.txt"

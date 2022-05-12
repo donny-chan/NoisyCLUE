@@ -56,10 +56,11 @@ class UNParallelEnZhDataset(Dataset):
 
 
 class UNParallelZhEnIterableDataset(IterableDataset):
-    def __init__(self, features_file: Path, cache_size: int):
+    def __init__(self, features_file: Path, cache_size: int, num_features: int):
         super().__init__()
         self.cache_size = cache_size
         self.features_file = Path(features_file)
+        self.num_examples = num_features
         self.reader = open(self.features_file, 'r', encoding='utf8')
 
     def chunked_iter(self):
@@ -76,7 +77,7 @@ class UNParallelZhEnIterableDataset(IterableDataset):
             yield chunk
 
     def __len__(self):
-        return 15886041
+        return self.num_examples
 
     def __iter__(self):
         for chunk in self.chunked_iter():

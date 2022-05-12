@@ -1,6 +1,7 @@
 from pathlib import Path
 from argparse import Namespace
 from time import time
+import json
 
 import torch
 from torch.nn import Module
@@ -93,6 +94,7 @@ class Trainer:
     - saving and resuming.
     '''
     LAST_EPOCH_FILE = 'last_epoch.txt'
+    LAST_CKPT_FILE = 'last_ckpt.txt'
     TRAIN_LOG_FILE = 'train.log'
 
     def log(self, *args, **kwargs):
@@ -106,16 +108,23 @@ class Trainer:
         batch_size: int=2,
         num_epochs: int=2,
         grad_acc_steps: int=1,
+        lr: float=1e-4,
         log_interval: int=1,
-        lr: float=1e-4):
+        eval_interval: int=500,
+        eval_strategy: str='step',
+        ):
 
         self.model = model
         self.output_dir = Path(output_dir)
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.grad_acc_steps = grad_acc_steps
-        self.log_interval = log_interval
         self.lr = lr
+        self.log_interval = log_interval
+        self.eval_strategy = eval_strategy
+        self.eval_interval = eval_interval
+        # self.save_strategy = eval_strategy
+        # self.save_interval = eval_interval
         self.setup_output_dir()
 
     def train_log(self, cur_loss):
@@ -133,7 +142,16 @@ class Trainer:
         self.train_log_writer = open(
             self.output_dir / self.TRAIN_LOG_FILE, 'w', encoding='utf8')
         self.log('--------- Training args:')
-        for key in ['output_dir', 'batch_size', 'num_epochs', 'grad_acc_steps', 'log_interval', 'lr']:
+        for key in [
+            'output_dir', 
+            'batch_size', 
+            'num_epochs', 
+            'grad_acc_steps', 
+            'lr',
+            'log_interval', 
+            'eval_interval',
+            'eval_strategy',
+        ]:
             self.log(f'{key:>16}: {getattr(self, key)}')
         self.log('---------')
 
@@ -152,140 +170,37 @@ class Trainer:
         self.scheduler = get_linear_scheduler(
             self.optimizer, warmup_ratio, num_opt_steps)
 
-    def get_last_epoch_file(self):
-        return self.output_dir / self.LAST_EPOCH_FILE
+    ''' Saving and Loading '''
 
-    def load_last_epoch(self):
-        return int(open(self.get_last_epoch_file(), 'r').read())
+    def get_last_ckpt_file(self) -> Path:
+        return self.output_dir / self.LAST_CKPT_FILE
 
-    def can_resume(self):
-        return self.get_last_epoch_file().exists()
+    def load_last_ckpt(self) -> dict:
+        return json.load(self.get_last_ckpt_file().open('r'))
 
-    def validate(self, dev_dataset):
-        '''
-        Call this on validation, NOT on test!
-        
-        Will output results to checkpoint dir.
-        '''
-        checkpoint_dir = self.output_dir / f'checkpoint-{self.cur_epoch}'
-        eval_output = self.evaluate(dev_dataset, 'dev', checkpoint_dir)
-        result = eval_output['result']
-        preds = eval_output['preds']
-        dump_json(result, checkpoint_dir / f'eval_result.json')
-        dump_json(preds, checkpoint_dir / f'preds.json')
+    def set_epoch_and_step(self, save_settings: dict) -> int:
+        self.cur_epoch = save_settings['epoch']
+        self.cur_train_step = save_settings['step']
+        self.eval_strategy = save_settings['save_strategy']
 
-    def train(
-        self, 
-        train_dataset: Dataset, 
-        dev_dataset: Dataset,
-        resume: bool=True,
-        ):
-        train_dataloader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
-
-        # Optimizer
-        num_opt_steps = len(train_dataloader) // self.grad_acc_steps * self.num_epochs
-        self.setup_optimizer_and_scheuler(self.lr, num_opt_steps)
-
-        # Handle resumption
-        if resume and self.can_resume():
-            self.resume()
-            self.validate(dev_dataset)
-            self.cur_epoch += 1
-        else:
-            self.cur_epoch = 0
-            self.cur_train_step = 0
-            self.train_start_time = time()
-
-        self.log(f'# params {get_param_count(self.model)}')
-        self.log('\n*** Start training ***')
-        self.log(f'batch size: {self.batch_size}')
-        self.log(f'# grad acc steps: {self.grad_acc_steps}')
-        self.log(f'# opt steps: {num_opt_steps}')
-        self.log(f'# epochs: {self.num_epochs}')
-        self.log(f'# train features: {len(train_dataset)}')
-        self.log(f'# train steps: {len(train_dataloader)}')
-        self.log(f'# dev features: {len(dev_dataset)}')
-
-        while self.cur_epoch < self.num_epochs:
-            self.train_epoch(train_dataloader)
-            self.save_checkpoint()
-            self.validate(dev_dataset)
-            self.cur_epoch += 1
-
-        self.log('*** End training ***')
-        return self.get_train_result()
-
-    def get_train_result(self) -> dict:
+    def save_settings(self):
         return {
-            'time_elapsed': time() - self.train_start_time,
+            'epoch': self.cur_epoch,
+            'step': self.cur_train_step,
+            'save_strategy': self.eval_strategy,
         }
 
-    def train_epoch(self, dataloader: DataLoader):
-        self.train_dataloader = dataloader
-        self.model.train()
-        self.log(f'*** Start training epoch {self.cur_epoch} ***')
-        for step, batch in enumerate(dataloader):
-            self.train_step(step, batch)
-        self.log(f'*** End training epoch {self.cur_epoch} ***')
+    def dump_last_ckpt(self):
+        with self.get_last_ckpt_file().open('w') as f:
+            json.dump(self.get_epoch_and_step(), f)
 
-    def eval_loop(self,
-        dataset: Dataset,
-        desc: str):
-        '''Evaluate model on dataloader'''
-        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+    def load_last_ckpt_dir(self) -> Path:
+        last_ckpt = self.load_last_ckpt()
+        ckpt_id = last_ckpt[last_ckpt['save_strategy']]
+        return self.output_dir / f'checkpoint-{ckpt_id}'
 
-        self.model.eval()
-        self.eval_start_time = time()
-        self.num_eval_steps = len(dataloader)
-
-        self.log(f'*** Start evaluating {desc} ***')
-        self.log(f'# features: {len(dataset)}')
-        self.log(f'# steps: {len(dataloader)}')
-
-        for step, batch in enumerate(dataloader):
-            self.eval_step(step, batch)
-
-        
-        self.log(f'*** Done evaluating {desc} ***')
-        
-        self.eval_end_time = time()
-        self.eval_time_elapsed = self.eval_end_time - self.eval_start_time
-
-    def save_checkpoint(self):
-        '''Save checkpoint'''
-        ckpt_dir = self.output_dir / f'checkpoint-{self.cur_epoch}'
-        self.log(f'*** Saving checkpoint to {ckpt_dir} ***')
-        ckpt_dir.mkdir(exist_ok=True, parents=True)
-        torch.save(self.model.state_dict(), ckpt_dir / 'pytorch_model.bin')
-        ckpt = {
-            'cur_epoch': self.cur_epoch,
-            'global_cur_step': self.cur_train_step,
-            'optimizer': self.optimizer.state_dict(),
-            'scheduler': self.scheduler.state_dict(),
-            'train_elapsed': time() - self.train_start_time,
-        }
-        torch.save(ckpt, ckpt_dir / 'ckpt.bin')
-        last_epoch_file = self.output_dir / self.LAST_EPOCH_FILE
-        open(last_epoch_file, 'w').write(str(self.cur_epoch))
-        self.log(f'*** Done saving checkpoint to {ckpt_dir} ***')
-    
-    def load_model(self, file: Path):
-        '''Load model from file'''
-        state_dict = torch.load(file, map_location='cpu')
-        self.model.load_state_dict(state_dict)
-
-    def load_ckpt(self, checkpoint_dir: Path):
-        '''Load checkpoint'''
-        self.log(f'*** Loading checkpoint from {checkpoint_dir} ***')
-        self.load_model(checkpoint_dir / 'pytorch_model.bin')
-        ckpt = torch.load(checkpoint_dir / 'ckpt.bin')
-
-        self.scheduler.load_state_dict(ckpt['scheduler'])
-        self.optimizer.load_state_dict(ckpt['optimizer'])
-        self.train_start_time = time() - ckpt['train_elapsed']
-        self.cur_epoch = ckpt['cur_epoch']
-        self.cur_train_step = ckpt['global_cur_step']
-        self.log(f'*** Done loading checkpoint from {checkpoint_dir} ***')
+    def can_resume(self) -> bool:
+        return self.get_last_ckpt_file().exists()
 
     def load_best_ckpt(self):
         '''Load best checkpoint in `self.output_dir` by dev loss'''
@@ -307,9 +222,152 @@ class Trainer:
     def resume(self):
         '''Resume training from last checkpoint'''
         self.log(f'*** Resuming training from last checkpoint ***')
-        self.cur_epoch = self.load_last_epoch()
-        self.load_ckpt(self.output_dir / f'checkpoint-{self.cur_epoch}')
+        last_ckpt_dir = self.load_last_ckpt_dir()
+        # self.cur_epoch = self.load_last_epoch())
+        # self.load_ckpt(self.output_dir / f'checkpoint-{self.cur_epoch}')
+        self.load_ckpt(last_ckpt_dir)
         self.log(f'*** Resumed training from end of epoch {self.cur_epoch} ***')
+
+    def save_ckpt(self, ckpt_dir: Path):
+        '''Save checkpoint'''
+        self.log(f'*** Saving checkpoint to {ckpt_dir} ***')
+        ckpt_dir.mkdir(exist_ok=True, parents=True)
+        torch.save(self.model.state_dict(), ckpt_dir / 'pytorch_model.bin')
+        ckpt = {
+            'cur_epoch': self.cur_epoch,
+            'global_cur_step': self.cur_train_step,
+            'optimizer': self.optimizer.state_dict(),
+            'scheduler': self.scheduler.state_dict(),
+            'train_elapsed': time() - self.train_start_time,
+        }
+        torch.save(ckpt, ckpt_dir / 'ckpt.bin')
+
+        self.dump_last_ckpt()
+        self.log(f'*** Done saving checkpoint to {ckpt_dir} ***')
+    
+    def load_model(self, file: Path):
+        '''Load model from file'''
+        state_dict = torch.load(file, map_location='cpu')
+        self.model.load_state_dict(state_dict)
+
+    def load_ckpt(self, ckpt_dir: Path):
+        '''Load checkpoint'''
+        self.log(f'*** Loading checkpoint from {ckpt_dir} ***')
+        self.load_model(ckpt_dir / 'pytorch_model.bin')
+        ckpt = torch.load(ckpt_dir / 'ckpt.bin')
+
+        self.scheduler.load_state_dict(ckpt['scheduler'])
+        self.optimizer.load_state_dict(ckpt['optimizer'])
+        self.train_start_time = time() - ckpt['train_elapsed']
+        self.cur_epoch = ckpt['cur_epoch']
+        self.cur_train_step = ckpt['global_cur_step']
+        self.log(f'*** Done loading checkpoint from {ckpt_dir} ***')
+
+
+    ''' End Saving and Loading '''
+
+    def validate(self, dev_dataset):
+        '''
+        Call this on validation, NOT on test!
+        
+        Will output results to checkpoint dir.
+        '''
+        if self.eval_strategy == 'epoch':
+            ckpt_dir = self.output_dir / f'checkpoint-{self.cur_epoch}'
+        elif self.eval_strategy == 'step':
+            ckpt_dir = self.output_dir / f'checkpoint-{self.cur_train_step}'
+
+        # Actual evaluation
+        eval_output = self.evaluate(dev_dataset, 'dev', ckpt_dir)
+        
+        result = eval_output['result']
+        preds = eval_output['preds']
+        dump_json(result, ckpt_dir / f'eval_result.json')
+        dump_json(preds, ckpt_dir / f'preds.json')
+
+    def get_train_dataloader(self, dataset):
+        return DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+
+    def train(
+        self, 
+        train_dataset: Dataset, 
+        dev_dataset: Dataset,
+        resume: bool=True,
+        ):
+        train_dataloader = self.get_train_dataloader(train_dataset)
+
+        # Optimizer
+        num_opt_steps = len(train_dataloader) // self.grad_acc_steps * self.num_epochs
+        self.setup_optimizer_and_scheuler(self.lr, num_opt_steps)
+
+        # Handle resumption
+        if resume and self.can_resume():
+            self.resume()
+            # TODO: This is incorrect?
+            self.validate(dev_dataset)
+            self.cur_epoch += 1
+        else:
+            self.cur_epoch = 0
+            self.cur_train_step = 0
+            self.train_start_time = time()
+
+        self.log(f'# params {get_param_count(self.model)}')
+        self.log('\n*** Start training ***')
+        self.log(f'batch size: {self.batch_size}')
+        self.log(f'# grad acc steps: {self.grad_acc_steps}')
+        self.log(f'# opt steps: {num_opt_steps}')
+        self.log(f'# epochs: {self.num_epochs}')
+        self.log(f'# train features: {len(train_dataset)}')
+        self.log(f'# train steps: {len(train_dataloader)}')
+        self.log(f'# dev features: {len(dev_dataset)}')
+
+        while self.cur_epoch < self.num_epochs:
+            self.cur_epoch += 1
+            self.train_epoch(train_dataloader)
+            if self.eval_strategy == 'epoch' and self.cur_epoch % self.eval_interval == 0:
+                self.save_ckpt()
+                self.validate(dev_dataset)
+
+        self.log('*** End training ***')
+        return self.get_train_result()
+
+    def get_train_result(self) -> dict:
+        return {
+            'time_elapsed': time() - self.train_start_time,
+        }
+
+    def train_epoch(self, dataloader: DataLoader):
+        self.train_dataloader = dataloader
+        self.model.train()
+        self.log(f'*** Start training epoch {self.cur_epoch} ***')
+        for step, batch in enumerate(dataloader):
+            self.train_step(step, batch)
+        self.log(f'*** End training epoch {self.cur_epoch} ***')
+
+    def eval_loop(self,
+        dataset: Dataset,
+        desc: str):
+        '''
+        
+        Evaluate model on dataloader
+        '''
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=False)
+
+        self.model.eval()
+        self.eval_start_time = time()
+        self.num_eval_steps = len(dataloader)
+
+        self.log(f'*** Start evaluating {desc} ***')
+        self.log(f'# features: {len(dataset)}')
+        self.log(f'# steps: {len(dataloader)}')
+
+        for step, batch in enumerate(dataloader):
+            self.eval_step(step, batch)
+        
+        self.log(f'*** Done evaluating {desc} ***')
+        
+        self.eval_end_time = time()
+        self.eval_time_elapsed = self.eval_end_time - self.eval_start_time
 
     '''
     Below are virtual functions required to implement
@@ -333,10 +391,19 @@ class Trainer:
         if self.cur_train_step % self.log_interval == 0:
             self.train_log(loss)
 
+        if self.eval_strategy == 'step' and self.cur_train_step % self.eval_interval == 0:
+            self.save_ckpt()
+            self.evaluate()
 
     def eval_step(self, step: int, batch: dict):
         raise NotImplementedError
 
     def evaluate(self, model: Module, dataset: Dataset, output_dir: Path, desc: str) -> dict:
+        '''
+        Overriders of this must:
+
+        - call `self.eval_loop`!!
+        - return a dict with keys: 'result' and 'preds'.
+        '''
         raise NotImplementedError
 
