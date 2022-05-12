@@ -55,7 +55,7 @@ def get_datasets(tokenizer, data_dir):
 
 def get_iterable_datasets():
     train_dataset = UNParallelZhEnIterableDataset('un_parallel/features.json', cache_size=2**10, num_examples=15886041)
-    dev_dataset = UNParallelZhEnIterableDataset('un_parallel/dev.json', cache_size=2**10, num_examples=1000)
+    dev_dataset = UNParallelZhEnIterableDataset('un_parallel/dev.json', cache_size=2**10, num_examples=100)
     return train_dataset, dev_dataset
 
 
@@ -114,7 +114,7 @@ def train(model, output_dir, args):
         eval_strategy='step',
     )
 
-    trainer.train(train_dataset, dev_dataset, resume=False)
+    trainer.train(train_dataset, dev_dataset)
 
 
 

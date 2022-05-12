@@ -100,7 +100,8 @@ class Trainer:
 
     def log(self, *args, **kwargs):
         print(*args, **kwargs, flush=True)
-        print(*args, **kwargs, file=self.train_log_writer, flush=True)
+        if self.do_log_to_file and self.train_log_writer:
+            print(*args, **kwargs, file=self.train_log_writer, flush=True)
 
     def __init__(
         self,
@@ -113,6 +114,8 @@ class Trainer:
         log_interval: int=1,
         eval_interval: int=500,
         eval_strategy: str='step',
+        do_log_to_file: bool=True,
+        log_file: str=None,
         ):
 
         self.model = model
@@ -124,6 +127,8 @@ class Trainer:
         self.log_interval = log_interval
         self.eval_strategy = eval_strategy
         self.eval_interval = eval_interval
+        self.do_log_to_file = do_log_to_file
+        self.log_file = log_file
         # self.save_strategy = eval_strategy
         # self.save_interval = eval_interval
         self.setup_output_dir()
@@ -141,8 +146,12 @@ class Trainer:
 
     def setup_output_dir(self):
         self.output_dir.mkdir(exist_ok=True, parents=True)
-        self.train_log_writer = open(
-            self.output_dir / self.TRAIN_LOG_FILE, 'w', encoding='utf8')
+        if self.do_log_to_file:
+            if self.log_file:
+                log_file = self.output_dir / self.log_file
+            else:
+                log_file = self.output_dir / self.TRAIN_LOG_FILE
+            self.train_log_writer = open(log_file, 'w', encoding='utf8')
         self.log('Setting up trainer with the following arguments:')
         self.log('--------- Training args ---------')
         for key in [
@@ -281,7 +290,7 @@ class Trainer:
         '''
         Call this on validation, NOT on test!
         
-        Will output results to checkpoint dir.
+        Will output results to current checkpoint dir.
         '''
         ckpt_dir = self.get_cur_ckpt_dir()
 

@@ -36,7 +36,7 @@ class UNParallelTrainer(Trainer):
         # self.scheduler = AdafactorSchedule(self.optimizer)
 
         # Will use the LR in optimizer
-        self.scheduler = get_constant_schedule_with_warmup(self.optimizer, 100)
+        self.scheduler = get_constant_schedule_with_warmup(self.optimizer, 20)
 
     def eval_step(self, step: int, batch: dict):
         # Forward
@@ -73,8 +73,8 @@ class UNParallelTrainer(Trainer):
         dataset.reset()
         self.eval_loop(dataset, desc)  # Must call this, this will call `eval_step`
 
-        dump_json(self.all_preds, 'preds.json')
-        dump_json(self.all_labels, 'labels.json')
+        # dump_json(self.all_preds, 'preds.json')
+        # dump_json(self.all_labels, 'labels.json')
 
         # Process gathered result
         output_dir.mkdir(exist_ok=True, parents=True)

@@ -86,7 +86,7 @@ class UNParallelZhEnIterableDataset(IterableDataset):
 
     def __iter__(self):
         for chunk in self.chunked_iter():
-            indices = list(range(self.cache_size))
+            indices = list(range(len(chunk)))
             random.shuffle(indices)
             # print('indices:', indices)
             # for sample in chunk:
