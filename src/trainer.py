@@ -2,6 +2,7 @@ from pathlib import Path
 from argparse import Namespace
 from time import time
 import json
+from typing import Union
 
 import torch
 from torch.nn import Module
@@ -130,6 +131,7 @@ class Trainer:
     def train_log(self, cur_loss):
         '''Called every `log_interval` steps during training.'''
         state = {
+            'step': self.cur_train_step,
             'ep': self.cur_train_step / len(self.train_dataloader),
             'lr': self.scheduler.get_last_lr()[0],
             'loss': cur_loss.item(),
@@ -141,7 +143,8 @@ class Trainer:
         self.output_dir.mkdir(exist_ok=True, parents=True)
         self.train_log_writer = open(
             self.output_dir / self.TRAIN_LOG_FILE, 'w', encoding='utf8')
-        self.log('--------- Training args:')
+        self.log('Setting up trainer with the following arguments:')
+        self.log('--------- Training args ---------')
         for key in [
             'output_dir', 
             'batch_size', 
@@ -153,7 +156,7 @@ class Trainer:
             'eval_strategy',
         ]:
             self.log(f'{key:>16}: {getattr(self, key)}')
-        self.log('---------')
+        self.log('---------------------------------')
 
     def setup_optimizer_and_scheuler(
         self, 
@@ -165,7 +168,7 @@ class Trainer:
         Setup optimizer and scheduler.
         Will set `self.optimizer` and `self.scheduler`.
         '''
-        self.log(f'Setting up optimizer and scheduler...')
+        self.log(f'Setting up AdamW optimizer and linear scheduler...')
         self.optimizer = get_adamw(self.model, lr, weight_decay)
         self.scheduler = get_linear_scheduler(
             self.optimizer, warmup_ratio, num_opt_steps)
@@ -183,7 +186,7 @@ class Trainer:
         self.cur_train_step = save_settings['step']
         self.eval_strategy = save_settings['save_strategy']
 
-    def save_settings(self):
+    def get_epoch_and_step(self):
         return {
             'epoch': self.cur_epoch,
             'step': self.cur_train_step,
@@ -228,8 +231,17 @@ class Trainer:
         self.load_ckpt(last_ckpt_dir)
         self.log(f'*** Resumed training from end of epoch {self.cur_epoch} ***')
 
-    def save_ckpt(self, ckpt_dir: Path):
-        '''Save checkpoint'''
+    def get_cur_ckpt_dir(self) -> Path:
+        if self.eval_strategy == 'step':
+            return self.output_dir / f'checkpoint-{self.cur_train_step}'
+        else:
+            return self.output_dir / f'checkpoint-{self.cur_epoch}'
+
+    def save_ckpt(self):
+        '''
+        Save current checkpoint to `{output_dir}/checkpoint-{ckpt_num}`
+        '''
+        ckpt_dir = self.get_cur_ckpt_dir()
         self.log(f'*** Saving checkpoint to {ckpt_dir} ***')
         ckpt_dir.mkdir(exist_ok=True, parents=True)
         torch.save(self.model.state_dict(), ckpt_dir / 'pytorch_model.bin')
@@ -263,7 +275,6 @@ class Trainer:
         self.cur_train_step = ckpt['global_cur_step']
         self.log(f'*** Done loading checkpoint from {ckpt_dir} ***')
 
-
     ''' End Saving and Loading '''
 
     def validate(self, dev_dataset):
@@ -272,13 +283,10 @@ class Trainer:
         
         Will output results to checkpoint dir.
         '''
-        if self.eval_strategy == 'epoch':
-            ckpt_dir = self.output_dir / f'checkpoint-{self.cur_epoch}'
-        elif self.eval_strategy == 'step':
-            ckpt_dir = self.output_dir / f'checkpoint-{self.cur_train_step}'
+        ckpt_dir = self.get_cur_ckpt_dir()
 
         # Actual evaluation
-        eval_output = self.evaluate(dev_dataset, 'dev', ckpt_dir)
+        eval_output = self.evaluate(dev_dataset, ckpt_dir, 'dev')
         
         result = eval_output['result']
         preds = eval_output['preds']
@@ -290,10 +298,12 @@ class Trainer:
 
     def train(
         self, 
-        train_dataset: Dataset, 
+        train_dataset: Union[Dataset, DataLoader], 
         dev_dataset: Dataset,
         resume: bool=True,
         ):
+        self.dev_dataset = dev_dataset
+        self.train_dataset = train_dataset
         train_dataloader = self.get_train_dataloader(train_dataset)
 
         # Optimizer
@@ -311,7 +321,6 @@ class Trainer:
             self.cur_train_step = 0
             self.train_start_time = time()
 
-        self.log(f'# params {get_param_count(self.model)}')
         self.log('\n*** Start training ***')
         self.log(f'batch size: {self.batch_size}')
         self.log(f'# grad acc steps: {self.grad_acc_steps}')
@@ -320,6 +329,7 @@ class Trainer:
         self.log(f'# train features: {len(train_dataset)}')
         self.log(f'# train steps: {len(train_dataloader)}')
         self.log(f'# dev features: {len(dev_dataset)}')
+        self.log(f'# params {get_param_count(self.model)}')
 
         while self.cur_epoch < self.num_epochs:
             self.cur_epoch += 1
@@ -373,6 +383,13 @@ class Trainer:
     Below are virtual functions required to implement
     '''
 
+    def backward(self, step: int, loss: Module):
+        loss.backward()
+        self.optimizer.step()
+        self.scheduler.step()
+        self.optimizer.zero_grad()
+        
+
     def train_step(self, step: int, batch: dict):
         self.cur_train_step += 1
 
@@ -382,10 +399,7 @@ class Trainer:
 
         # Backward
         if self.cur_train_step % self.grad_acc_steps == 0:
-            loss.backward()
-            self.optimizer.step()
-            self.scheduler.step()
-            self.optimizer.zero_grad()
+            self.backward(step, loss)
 
         # Log
         if self.cur_train_step % self.log_interval == 0:
@@ -393,7 +407,8 @@ class Trainer:
 
         if self.eval_strategy == 'step' and self.cur_train_step % self.eval_interval == 0:
             self.save_ckpt()
-            self.evaluate()
+            self.validate(self.dev_dataset)
+            self.model.train()
 
     def eval_step(self, step: int, batch: dict):
         raise NotImplementedError

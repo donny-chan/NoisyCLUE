@@ -10,7 +10,7 @@ from transformers import (
 )
 from transformers.optimization import Adafactor, AdafactorSchedule
 
-from trainer import Trainer
+from un_parallel.trainer import UNParallelTrainer
 from un_parallel.data import UNParallelEnZhDataset, UNParallelZhEnIterableDataset
 from arguments import parse_args
 from utils import dump_args
@@ -54,8 +54,8 @@ def get_datasets(tokenizer, data_dir):
 
 
 def get_iterable_datasets():
-    train_dataset = UNParallelZhEnIterableDataset('un_parallel/features.json', cache_size=2**12, num_examples=15886041)
-    dev_dataset = UNParallelZhEnIterableDataset('un_parallel/dev.json', cache_size=2**12, num_examples=10000)
+    train_dataset = UNParallelZhEnIterableDataset('un_parallel/features.json', cache_size=2**10, num_examples=15886041)
+    dev_dataset = UNParallelZhEnIterableDataset('un_parallel/dev.json', cache_size=2**10, num_examples=1000)
     return train_dataset, dev_dataset
 
 
@@ -99,15 +99,18 @@ def get_trainer(model, tokenizer, data_dir, output_dir, args):
 
 
 def train(model, output_dir, args):
-    log('train')
-    log('Getting datasets')
+    log('Building iterable datasets...')
     train_dataset, dev_dataset = get_iterable_datasets()
 
-    trainer = Trainer(
+    trainer = UNParallelTrainer(
         model,
         output_dir,
-        lr=1e-4,
-        eval_interval=20,
+        lr=args.lr,
+        grad_acc_steps=args.grad_acc_steps,
+        batch_size=args.batch_size,
+        log_interval=args.log_interval,
+        num_epochs=args.num_epochs,
+        eval_interval=1024,
         eval_strategy='step',
     )
 
@@ -126,7 +129,6 @@ model = AutoModelForSeq2SeqLM.from_pretrained(args.model_path)
 
 # trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
 # trainer.train()
-
 
 train(model, output_dir, args)
 

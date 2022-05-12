@@ -56,12 +56,13 @@ class UNParallelEnZhDataset(Dataset):
 
 
 class UNParallelZhEnIterableDataset(IterableDataset):
-    def __init__(self, features_file: Path, cache_size: int, num_features: int):
+    def __init__(self, features_file: Path, cache_size: int, num_examples: int):
         super().__init__()
         self.cache_size = cache_size
         self.features_file = Path(features_file)
-        self.num_examples = num_features
-        self.reader = open(self.features_file, 'r', encoding='utf8')
+        self.num_examples = num_examples
+
+        self.reset()
 
     def chunked_iter(self):
         '''
@@ -76,6 +77,10 @@ class UNParallelZhEnIterableDataset(IterableDataset):
         if chunk != []:
             yield chunk
 
+    def reset(self):
+        self.count = 0
+        self.reader = open(self.features_file, 'r', encoding='utf8')
+
     def __len__(self):
         return self.num_examples
 
@@ -87,6 +92,12 @@ class UNParallelZhEnIterableDataset(IterableDataset):
             # for sample in chunk:
             #     print(sample['input_ids'][:10])
             for i in indices:
+                if self.count == self.num_examples:
+                    break
                 for k, v in chunk[i].items():
                     chunk[i][k] = LongTensor(v)
                 yield chunk[i]
+                self.count += 1
+            if self.count == self.num_examples:
+                break
+        self.reader.close()
