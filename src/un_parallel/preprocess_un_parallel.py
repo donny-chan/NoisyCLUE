@@ -44,15 +44,15 @@ for en_lines, zh_lines in zip(iter_lines(en_file), iter_lines(zh_file)):
         'padding': 'max_length',
         'truncation': True,
     }
-    inputs = tokenizer(zh_lines, **kwargs)
-    labels = tokenizer(en_lines, **kwargs)
+    zh = tokenizer(zh_lines, **kwargs)
+    en = tokenizer(en_lines, **kwargs)
 
-    count = len(inputs['input_ids'])
+    count = len(zh['input_ids'])
     for i in range(count):
         feat = {
-            'input_ids': inputs['input_ids'][i],
-            'attention_mask': inputs['attention_mask'][i],
-            'labels': labels['input_ids'][i],
+            'input_ids': zh['input_ids'][i],
+            'attention_mask': zh['attention_mask'][i],
+            'labels': en['input_ids'][i],
         }
         writer.write(json.dumps(feat) + '\n')
     processed_cnt += count
@@ -60,3 +60,4 @@ for en_lines, zh_lines in zip(iter_lines(en_file), iter_lines(zh_file)):
     processed_prop = processed_cnt / total
     print(f'Processed [{processed_cnt}/{total}], time_elapsed: {time_elapsed}, expected_time: {time_elapsed / processed_prop}', flush=True)
 
+print('done')

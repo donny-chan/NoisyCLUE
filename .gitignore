@@ -28,3 +28,4 @@ __pycache__
 file.txt
 preds.json
 labels.json
+src/*.json

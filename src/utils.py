@@ -57,3 +57,14 @@ def get_acc(preds: np.array, labels: np.array) -> float:
 
 def get_param_count(model: torch.nn.Module) -> int:
     return sum(p.numel() for p in model.parameters())
+
+class Logger:
+    def __init__(self, out_file: Path):
+        self.out_path = Path(out_file)
+        self.out_path.parent.mkdir(parents=True, exist_ok=True)
+        self.out_file = self.out_path.open('w')
+    
+    def log(self, *args, **kwargs):
+        print(*args, **kwargs, flush=True)
+        print(*args, **kwargs, file=self.out_file, flush=True)
+
