@@ -20,8 +20,8 @@ def test(trainer: Trainer, dataset: CMRC2018Dataset, output_dir: Path, desc: str
     result = eval_output['result']
     preds = eval_output['preds']
     print(result, flush=True)
-    utils.dump_json(result, output_dir / 'result.json')
-    utils.dump_json(preds, output_dir / 'preds.json')
+    utils.dump_json(result, output_dir / 'result.json', indent=2)
+    utils.dump_json(preds, output_dir / 'preds.json', indent=2)
 
 
 def test_all(trainer: Trainer, data_dir: Path, output_dir: Path, tok_name: str):
