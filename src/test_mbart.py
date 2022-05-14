@@ -15,18 +15,20 @@ logger = None
 def log(*args, **kwargs): logger.log(*args, **kwargs)
 
 
-def get_dataset(tokenizer, file):
-    return NmtDataset(file, tokenizer, 128)
+def get_dataset(tokenizer, file, num_examples=None):
+    return NmtDataset(file, tokenizer, num_examples=num_examples)
 
 
 def test(model, dataset, output_dir: Path):
     log('Building dataloader...')
-    dataloader = DataLoader(dataset, batch_size=8)
+    dataloader = DataLoader(dataset, batch_size=16)
 
     # Results
     preds = []
     
     log('*** Testing ***')
+    log(f'# steps: {len(dataloader)}')
+    log(f'# examples: {len(dataset)}')
     for batch in tqdm(dataloader):
         for k, v in batch.items(): batch[k] = v.cuda()  # Move to GPU
         generated_tokens = model.generate(**batch)
@@ -36,17 +38,19 @@ def test(model, dataset, output_dir: Path):
 
     # Dump results
     log(f'Dumping results')
+    output_dir.mkdir(exist_ok=True, parents=True)
     dump_jsonl(preds, output_dir / 'preds.json')
 
 
 def test_all(model, tokenizer, data_dir: Path, output_dir: Path):
-    log('test_all')
+    log('Testing all...')
     for phase in ['clean', 'noisy_1', 'noisy_2', 'noisy_3']:
         logger.log(phase)
         examples_file = data_dir / f'nmt_test_{phase}.json'
         logger.log(f'Getting dataset from {examples_file}')
         dataset = get_dataset(tokenizer, examples_file)
-        test(model, dataset, output_dir / phase)
+        # Test
+        test(model, dataset, output_dir / f'test_{phase}')
 
 
 model_path = "facebook/mbart-large-50-many-to-one-mmt"
