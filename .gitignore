@@ -13,6 +13,7 @@ all_tsv
 data/afqmc
 # data/autoasr
 data/keyboard
+data/finalasr
 data/un-parallel
 data/en-zh
 src/un_parallel/*.json
