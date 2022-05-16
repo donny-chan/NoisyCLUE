@@ -3,18 +3,18 @@
 #SBATCH -G 1
 #SBATCH --job-name cmrc-rb
 
-model_path="chinese-roberta-wwm-ext"
-# model_path="chinese-macbert-base"
-task="cmrc2018"
+# model_path="chinese-roberta-wwm-ext"
+model_path="chinese-macbert-base"
+task="cmrc2018_7762"
 task_parent="keyboard"
 # task_parent="autoasr"
-lr="1e-5"
+lr="1e-4"
 
 output_dir="results/${task_parent}/${task}/${model_path}_lr${lr}"
 data_dir="../data/${task_parent}/${task}"
 
 # Command
-cmd="python3 train_bert_qa.py"
+cmd="python3 train_bert_cmrc.py"
 cmd+=" --model_path hfl/$model_path"
 cmd+=" --output_dir $output_dir"
 cmd+=" --data_dir $data_dir"
