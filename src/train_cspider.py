@@ -8,15 +8,14 @@ from torch.utils.data import DataLoader
 from transformers import MBartForConditionalGeneration, MBart50TokenizerFast
 
 from utils import load_jsonl, dump_jsonl, get_param_count, Logger
-from nmt.data import NmtDataset
-
+from cspider.data import CSpiderDataset
 
 logger = None
 def log(*args, **kwargs): logger.log(*args, **kwargs)
 
 
-def get_dataset(tokenizer, file, num_examples=None):
-    return NmtDataset(file, tokenizer, num_examples=num_examples)
+def get_dataset(tokenizer, file, num_examples=None) -> CSpiderDataset:
+    return CSpiderDataset(file, tokenizer, num_examples=num_examples)
 
 
 def test(model, dataset, output_dir: Path):
@@ -44,12 +43,7 @@ def test(model, dataset, output_dir: Path):
 
 def test_all(model, tokenizer, data_dir: Path, output_dir: Path):
     log('Testing all...')
-    for phase in [
-        # 'clean', 
-        # 'noisy_1', 
-        'noisy_2', 
-        'noisy_3'
-        ]:
+    for phase in ['clean', 'noisy_1', 'noisy_2', 'noisy_3']:
         logger.log(phase)
         examples_file = data_dir / f'nmt_test_{phase}.json'
         logger.log(f'Getting dataset from {examples_file}')
@@ -58,11 +52,19 @@ def test_all(model, tokenizer, data_dir: Path, output_dir: Path):
         test(model, dataset, output_dir / f'test_{phase}')
 
 
+def get_trainer(model, data_dir: Path, output_dir: Path) -> Trainer:
+    
+
+
+def train(model, tokenizer, data_dir: Path, output_dir: Path):
+    trainer 
+
+
 model_path = "facebook/mbart-large-50-many-to-one-mmt"
 
-output_dir = Path('results/nmt/mbart-large')
-data_dir = Path('../data/keyboard/nmt')
-log_file = output_dir / 'test.log'
+output_dir = Path('results/cspider/mbart-large')
+data_dir = Path('../data/keyboard/cspider')
+log_file = output_dir / 'train.log'
 
 logger = Logger(log_file)
 
@@ -75,4 +77,5 @@ log(f'# params: {get_param_count(model)}')
 
 
 if __name__ == '__main__':
+    train(model, tokenizer, data_dir, output_dir)
     test_all(model, tokenizer, data_dir, output_dir)
