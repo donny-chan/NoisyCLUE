@@ -6,7 +6,7 @@ from transformers.optimization import Adafactor, AdafactorSchedule, get_constant
 
 from trainer import Trainer
 from utils import dump_json
-from .data import UNParallelZhEnIterableDataset
+from .data import CSpiderDataset
 
 
 class UNParallelTrainer(Trainer):
@@ -27,10 +27,9 @@ class UNParallelTrainer(Trainer):
             relative_step=False, 
             warmup_init=False, 
             lr=lr)
-        # self.scheduler = AdafactorSchedule(self.optimizer)
 
         # Will use the LR in optimizer
-        self.scheduler = get_constant_schedule_with_warmup(self.optimizer, 3500)
+        self.scheduler = get_constant_schedule_with_warmup(self.optimizer, 1000)
 
     def eval_step(self, step: int, batch: dict):
         # Forward
@@ -53,7 +52,7 @@ class UNParallelTrainer(Trainer):
 
 
     def evaluate(self,
-        dataset: UNParallelZhEnIterableDataset,
+        dataset: CSpiderDataset,
         output_dir: Path,
         desc: str='dev',
         ) -> dict:
@@ -66,8 +65,8 @@ class UNParallelTrainer(Trainer):
         dataset.reset()
         self.eval_loop(dataset, desc)  # Must call this, this will call `eval_step`
 
-        # dump_json(self.all_preds, 'preds.json')
-        # dump_json(self.all_labels, 'labels.json')
+        dump_json(self.all_preds, 'preds.json')
+        dump_json(self.all_labels, 'labels.json')
 
         # Process gathered result
         output_dir.mkdir(exist_ok=True, parents=True)

@@ -11,7 +11,8 @@ from transformers import (
 from transformers.optimization import Adafactor, AdafactorSchedule
 
 from un_parallel.trainer import UNParallelTrainer
-from un_parallel.data import UNParallelEnZhDataset, UNParallelZhEnIterableDataset
+# from un_parallel.data import UNParallelEnZhDataset, UNParallelZhEnIterableDataset
+from cspider.data import CSpiderDataset
 from arguments import parse_args
 from utils import dump_args
 
@@ -27,44 +28,46 @@ def log(*args, **kwargs):
 
 
 def get_datasets(tokenizer, data_dir):
-    def get_lines(data_dir: Path, prefix='UNv1.0.en-zh') -> tuple:
-        log(f'Loading examples from "{data_dir}", prefix: "{prefix}"')
-        log('Loading English sentences...')
-        with open(data_dir / f'{prefix}.en', 'r') as f:
-            en_lines = [line.strip() for line in tqdm(f, mininterval=2)]
-        log(f'Loading Chinese sentences...')
-        with open(data_dir / f'{prefix}.zh', 'r') as f:
-            zh_lines = [line.strip() for line in tqdm(f, mininterval=2)]
-        log(f'Loaded {len(en_lines)} pairs of sentences')
-        return en_lines, zh_lines
-    log('Loading sentences...')
-    en_lines, zh_lines = get_lines(data_dir, 'small')
-    # en_lines, zh_lines = get_lines(data_dir)
-    log('Splitting list of sentences...')
-    train_en_lines = en_lines[:int(len(en_lines) * 0.9)]
-    train_zh_lines = zh_lines[:int(len(zh_lines) * 0.9)]
-    dev_en_lines = en_lines[int(len(en_lines) * 0.9):]
-    dev_zh_lines = zh_lines[int(len(zh_lines) * 0.9):]
-    del en_lines, zh_lines
+    # def get_lines(data_dir: Path, prefix='UNv1.0.en-zh') -> tuple:
+    #     log(f'Loading examples from "{data_dir}", prefix: "{prefix}"')
+    #     log('Loading English sentences...')
+    #     with open(data_dir / f'{prefix}.en', 'r') as f:
+    #         en_lines = [line.strip() for line in tqdm(f, mininterval=2)]
+    #     log(f'Loading Chinese sentences...')
+    #     with open(data_dir / f'{prefix}.zh', 'r') as f:
+    #         zh_lines = [line.strip() for line in tqdm(f, mininterval=2)]
+    #     log(f'Loaded {len(en_lines)} pairs of sentences')
+    #     return en_lines, zh_lines
+    # log('Loading sentences...')
+    # en_lines, zh_lines = get_lines(data_dir, 'small')
+    # # en_lines, zh_lines = get_lines(data_dir)
+    # log('Splitting list of sentences...')
+    # train_en_lines = en_lines[:int(len(en_lines) * 0.9)]
+    # train_zh_lines = zh_lines[:int(len(zh_lines) * 0.9)]
+    # dev_en_lines = en_lines[int(len(en_lines) * 0.9):]
+    # dev_zh_lines = zh_lines[int(len(zh_lines) * 0.9):]
+    # del en_lines, zh_lines
 
-    log('Building datasets...')
-    train_dataset = UNParallelEnZhDataset(tokenizer, train_en_lines, train_zh_lines, max_len=128)
-    dev_dataset = UNParallelEnZhDataset(tokenizer, dev_en_lines, dev_zh_lines, max_len=128)
+    # log('Building datasets...')
+    # train_dataset = UNParallelEnZhDataset(tokenizer, train_en_lines, train_zh_lines, max_len=128)
+    # dev_dataset = UNParallelEnZhDataset(tokenizer, dev_en_lines, dev_zh_lines, max_len=128)
+    train_dataset = CSpiderDataset(tokenizer, data_dir / 'train.json')
+    dev_dataset = CSpiderDataset(tokenizer, data_dir / 'dev.json')
     return train_dataset, dev_dataset
 
 
-def get_iterable_datasets():
+def get_iterable_datasets(tokenizer, data_dir: Path):
     train_dataset = UNParallelZhEnIterableDataset('un_parallel/features.json', cache_size=2**10, num_examples=15886041)
     dev_dataset = UNParallelZhEnIterableDataset('un_parallel/dev.json', cache_size=2**10, num_examples=100)
     return train_dataset, dev_dataset
 
 
 def get_trainer(model, tokenizer, data_dir, output_dir, args):
-    # log('Building datasets...')
-    # train_dataset, dev_dataset = get_datasets(tokenizer, en_lines, zh_lines)
-
     log('Building datasets...')
-    train_dataset, dev_dataset = get_iterable_datasets()
+    train_dataset, dev_dataset = get_datasets(tokenizer, en_lines, zh_lines)
+
+    # log('Building datasets...')
+    # train_dataset, dev_dataset = get_iterable_datasets()
 
     log('Building trainer...')
     training_args = Seq2SeqTrainingArguments(

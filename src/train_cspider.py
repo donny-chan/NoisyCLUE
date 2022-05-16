@@ -9,6 +9,7 @@ from transformers import MBartForConditionalGeneration, MBart50TokenizerFast
 
 from utils import load_jsonl, dump_jsonl, get_param_count, Logger
 from cspider.data import CSpiderDataset
+from cspider.trainer import Trainer as CSpiderTrainer
 
 logger = None
 def log(*args, **kwargs): logger.log(*args, **kwargs)
@@ -52,12 +53,12 @@ def test_all(model, tokenizer, data_dir: Path, output_dir: Path):
         test(model, dataset, output_dir / f'test_{phase}')
 
 
-def get_trainer(model, data_dir: Path, output_dir: Path) -> Trainer:
-    
+def get_trainer(model, data_dir: Path, output_dir: Path) -> CSpiderTrainer:
+    pass
 
 
 def train(model, tokenizer, data_dir: Path, output_dir: Path):
-    trainer 
+    pass
 
 
 model_path = "facebook/mbart-large-50-many-to-one-mmt"
