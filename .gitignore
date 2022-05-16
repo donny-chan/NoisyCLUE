@@ -12,7 +12,12 @@ table.tsv
 all_tsv
 data/afqmc
 # data/autoasr
-data/keyboard
+data/keyboard/cspider
+data/keyboard/nmt
+data/keyboard/cmrc2018
+data/keyboard/cluener
+
+
 data/finalasr
 data/un-parallel
 data/en-zh
