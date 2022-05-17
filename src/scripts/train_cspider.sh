@@ -2,12 +2,12 @@
 #SBATCH -G 1
 #SBATCH --mem 32G
 #SBATCH --job-name csp-mt5b
-#__SBATCH -p rtx2080
+#SBATCH -p rtx2080
 
-model_path="mt5-base"
-lr="3e-5"
+model_path="mbart-large-cc25"
+lr="1e-4"
 
-output_dir="results/cspider/${model_path}_const-lr${lr}"
+output_dir="results/cspider/${model_path}_lr${lr}"
 data_dir="..."
 
 # Command
