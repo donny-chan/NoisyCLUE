@@ -61,9 +61,10 @@ def train(model, tokenizer, data_dir: Path, output_dir: Path):
     pass
 
 
-model_path = "facebook/mbart-large-50-many-to-one-mmt"
+# model_path = "facebook/mbart-large-50-many-to-one-mmt"
+model_path = 'facebook/mbart-large-cc25'
 
-output_dir = Path('results/cspider/mbart-large')
+output_dir = Path('results/cspider/mbart-large-cc25')
 data_dir = Path('../data/keyboard/cspider')
 log_file = output_dir / 'train.log'
 
@@ -74,6 +75,7 @@ model = MBartForConditionalGeneration.from_pretrained(model_path).cuda()
 log('Getting tokenizer...')
 tokenizer = MBart50TokenizerFast.from_pretrained(model_path)
 tokenizer.src_lang = "zh_CN"
+tokenizer.tgt_lang = "en_XX"
 log(f'# params: {get_param_count(model)}')
 
 
