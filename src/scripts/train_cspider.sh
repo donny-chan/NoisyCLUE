@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -p rtx2080
 #SBATCH -G 1
 #SBATCH --mem 32G
-#SBATCH --job-name un-mt5b
+#SBATCH --job-name csp-mt5b
+#__SBATCH -p rtx2080
 
 model_path="mt5-base"
 lr="3e-5"

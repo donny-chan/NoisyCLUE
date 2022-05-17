@@ -15,7 +15,7 @@ output_dir="results/${task_parent}/${task}/${model_name}_lr${lr}"
 num_gpus=1
 
 # Command
-cmd="python3 train_mt5.py"
+cmd="python3 train_afqmc_mt5.py"
 # cmd="torchrun --nnodes=1 --nproc_per_node=$num_gpus --rdzv_id=1 --rdzv_backend=c10d --rdzv_endpoint=localhost train_mt5.py"
 cmd+=" --model_path google/$model_name"
 cmd+=" --output_dir $output_dir"

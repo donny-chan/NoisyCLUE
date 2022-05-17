@@ -6,7 +6,7 @@ results_zh_verbalizer
 table.tsv
 
 # Data
-
+.cache
 
 # Task data
 all_tsv
