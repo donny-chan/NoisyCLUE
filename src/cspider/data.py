@@ -4,11 +4,11 @@ from utils import load_jsonl
 
 
 class CSpiderDataset(Dataset):
-    def __init__(self, tokenizer, examples_file):
+    def __init__(self, tokenizer, examples_file, num_examples=None):
         self.tokenizer = tokenizer
         self.examples_file = examples_file
-        self.examples = self.get_examples(examples_file)
-        
+        self.examples = self.get_examples(examples_file)[:num_examples]
+        self.features = self.get_features(self.examples)
 
     def get_examples(self, file):
         return load_jsonl(file)
