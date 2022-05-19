@@ -3,7 +3,7 @@ from pathlib import Path
 from utils import load_jsonl, dump_jsonl
 
 
-test_file = Path('keyboard/cluener/ner_test.json')
+test_file = Path('asr/cluener/ner_test.json')
 raw_examples = load_jsonl(test_file)
 
 test_types = {
