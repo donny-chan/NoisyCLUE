@@ -5,11 +5,13 @@ from utils import load_json, load_jsonl
 
 
 task_type = 'keyboard'
+# task = 'cmrc2018_7762'
+# task = 'cmrc2018_6653'
 task = 'cmrc2018'
 
 
 def get_id2labels() -> dict:
-    examples_file = Path('../data/keyboard/cmrc2018/cmrc2018_test_clean.json')
+    examples_file = Path(f'../data/keyboard/{task}/cmrc2018_test_clean.json')
     examples = load_jsonl(examples_file)
     id2labels = {}
     for example in examples:
@@ -78,7 +80,7 @@ headers = {
 types = list(headers.values())
 headers = list(headers.keys())
 
-results_dir = Path('results') / task_type / task
+results_dir = Path('results') / task
 print(f'Getting results from {results_dir}')
 
 id2labels = get_id2labels()

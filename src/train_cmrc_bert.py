@@ -32,7 +32,7 @@ def test_all(trainer: Trainer, data_dir: Path, output_dir: Path, tok_name: str):
         dataset = CMRC2018Dataset(trainer.tokenizer, examples_file, 
             has_labels=True, tok_name=tok_name)
         test(trainer, dataset, output_dir=output_dir / f'test_{test_type}', 
-             desc=test_type)
+            desc=test_type)
 
 
 def main():
