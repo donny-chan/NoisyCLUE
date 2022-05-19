@@ -10,8 +10,8 @@ task="afqmc_unbalanced"
 # Model
 model_path="chinese-roberta-wwm-ext"
 lr="5e-5"
-model_path="chinese-macbert-base"
-lr="2e-5"
+# model_path="chinese-macbert-base"
+# lr="2e-5"
 
 # output_dir="results/${task_parent}/${task}/${model_path}_lr${lr}"
 output_dir="results/${task}/${model_path}_lr${lr}"

@@ -25,14 +25,28 @@ def test(trainer: Trainer, dataset: CMRC2018Dataset, output_dir: Path, desc: str
 
 
 def test_all(trainer: Trainer, data_dir: Path, output_dir: Path, tok_name: str):
-    print('test_all', flush=True)
+    print('Loading best model', flush=True)
     trainer.load_best_model(output_dir)
-    for test_type in ['clean', 'noisy_1', 'noisy_2', 'noisy_3']:
-        examples_file = data_dir / f'cmrc2018_test_{test_type}.json'
-        dataset = CMRC2018Dataset(trainer.tokenizer, examples_file, 
-            has_labels=True, tok_name=tok_name)
-        test(trainer, dataset, output_dir=output_dir / f'test_{test_type}', 
-            desc=test_type)
+    
+    # Clean
+    print('*** Testing clean ***')
+    file_examples = data_dir / 'test_clean.json'
+    data = CMRC2018Dataset(trainer.tokenizer, file_examples, has_labels=True, 
+                           tok_name=tok_name)
+    test(trainer, data, output_dir / 'test_clean', 'clean')
+    
+    for noise_type in [
+        'keyboard',
+        'asr',
+    ]:
+        for i in range(1, 4):
+            phase_name = f'test_noisy_{noise_type}_{i}'
+            print(f'*** Testing {phase_name} ***')
+            file_examples = data_dir / f'{phase_name}.json'
+            dataset = CMRC2018Dataset(trainer.tokenizer, file_examples, 
+                has_labels=True, tok_name=tok_name)
+            test(trainer, dataset, output_dir=output_dir / phase_name, 
+                desc=phase_name)
 
 
 def main():
@@ -54,9 +68,9 @@ def main():
     if not args.resume_from_checkpoint:
         # Data
         print('Loading train and dev data', flush=True)
-        train_dataset = CMRC2018Dataset(tokenizer, data_dir / 'cmrc2018_train.json', 
+        train_dataset = CMRC2018Dataset(tokenizer, data_dir / 'train.json', 
             has_labels=True, tok_name=tok_name)
-        eval_dataset = CMRC2018Dataset(tokenizer, data_dir / 'cmrc2018_dev.json', 
+        eval_dataset = CMRC2018Dataset(tokenizer, data_dir / 'dev.json', 
             has_labels=True, tok_name=tok_name)
         trainer.train(train_dataset, eval_dataset)
     test_all(trainer, data_dir, output_dir, tok_name)

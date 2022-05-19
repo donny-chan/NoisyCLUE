@@ -114,8 +114,8 @@ def test(trainer, tokenizer, data_dir):
     # Test noisy
     for noise_type in ['keyboard', 'asr']:
         for i in range(1, 4):
-            print('\nTesting phase:', phase_name, flush=True)
             phase_name = f'test_noisy_{noise_type}_{i}'
+            print('\nTesting phase:', phase_name, flush=True)
             file_examples = data_dir / f'{phase_name}.json'
             data = AfqmcDataset(file_examples, phase_name, tokenizer, 512)
             predict(trainer, data, output_dir / phase_name)

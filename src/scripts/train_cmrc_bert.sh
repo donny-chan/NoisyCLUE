@@ -3,15 +3,18 @@
 #SBATCH --job-name cmrc-rb
 #__SBATCH -p rtx2080
 
-# model_path="chinese-roberta-wwm-ext"
-model_path="chinese-macbert-base"
 task="cmrc2018"
-task_parent="keyboard"
+# task_parent="keyboard"
 # task_parent="autoasr"
+
+model_path="chinese-roberta-wwm-ext"
+model_path="chinese-macbert-base"
+
+# Hyperparams
 lr="1e-4"
 
 output_dir="results/${task}/${model_path}_lr${lr}"
-data_dir="../data/${task_parent}/${task}"
+data_dir="../data/realtypo/${task}"
 
 # Command
 cmd="python3 train_cmrc_bert.py"
@@ -24,7 +27,7 @@ cmd+=" --batch_size 4"
 cmd+=" --grad_acc_steps 64"
 cmd+=" --lr $lr"
 cmd+=" --log_interval 100"
-# cmd+=" --resume_from_checkpoint"
+cmd+=" --resume_from_checkpoint placeholder"
 
 logfile="$output_dir/log.txt"
 mkdir -p $output_dir
