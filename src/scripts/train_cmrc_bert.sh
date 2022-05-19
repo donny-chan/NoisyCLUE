@@ -3,14 +3,14 @@
 #SBATCH --job-name cmrc-rb
 #__SBATCH -p rtx2080
 
-model_path="chinese-roberta-wwm-ext"
-# model_path="chinese-macbert-base"
-task="cmrc2018_7762"
+# model_path="chinese-roberta-wwm-ext"
+model_path="chinese-macbert-base"
+task="cmrc2018"
 task_parent="keyboard"
 # task_parent="autoasr"
 lr="1e-4"
 
-output_dir="results/${task_parent}/${task}/${model_path}_lr${lr}"
+output_dir="results/${task}/${model_path}_lr${lr}"
 data_dir="../data/${task_parent}/${task}"
 
 # Command

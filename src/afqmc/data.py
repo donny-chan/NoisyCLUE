@@ -36,7 +36,7 @@ class AfqmcDataset(Dataset):
     def __init__(self, file: str, phase: str, tokenizer, max_seq_len: int, 
                  num_examples: int=None):
         self.file = file
-        # self.examples = get_examples(file, phase)
+        print('Loading examples from:', file)
         examples = get_examples(file, phase)[:num_examples]
         self.features = self.get_features(examples, tokenizer, max_seq_len)
 

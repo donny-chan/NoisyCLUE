@@ -193,13 +193,13 @@ class Trainer:
     def set_epoch_and_step(self, save_settings: dict) -> int:
         self.cur_epoch = save_settings['epoch']
         self.cur_train_step = save_settings['step']
-        self.eval_strategy = save_settings['save_strategy']
+        self.eval_strategy = save_settings['eval_strategy']
 
     def get_epoch_and_step(self):
         return {
             'epoch': self.cur_epoch,
             'step': self.cur_train_step,
-            'save_strategy': self.eval_strategy,
+            'eval_strategy': self.eval_strategy,
         }
 
     def dump_last_ckpt(self):
@@ -208,7 +208,7 @@ class Trainer:
 
     def load_last_ckpt_dir(self) -> Path:
         last_ckpt = self.load_last_ckpt()
-        ckpt_id = last_ckpt[last_ckpt['save_strategy']]
+        ckpt_id = last_ckpt[last_ckpt['eval_strategy']]
         return self.output_dir / f'checkpoint-{ckpt_id}'
 
     def can_resume(self) -> bool:
@@ -270,6 +270,7 @@ class Trainer:
         '''Load model from file'''
         state_dict = torch.load(file, map_location='cpu')
         self.model.load_state_dict(state_dict)
+        self.model = self.model.cuda()
 
     def load_ckpt(self, ckpt_dir: Path):
         '''Load checkpoint'''
@@ -363,6 +364,9 @@ class Trainer:
             self.train_step(step, batch)
         self.log(f'*** End training epoch {self.cur_epoch} ***')
 
+    def prepare_batch(self, batch: dict) -> dict:
+        return {k: v.cuda() for k, v in batch.items()}
+
     def eval_loop(self,
         dataset: Dataset,
         desc: str):
@@ -381,6 +385,7 @@ class Trainer:
         self.log(f'# steps: {len(dataloader)}')
 
         for step, batch in enumerate(dataloader):
+            batch = self.prepare_batch(batch)
             self.eval_step(step, batch)
         
         self.log(f'*** Done evaluating {desc} ***')
@@ -420,14 +425,59 @@ class Trainer:
             self.model.train()
 
     def eval_step(self, step: int, batch: dict):
-        raise NotImplementedError
+        outputs = self.model(**batch)
+        self.gather_eval_result(step, batch, outputs)
 
-    def evaluate(self, model: Module, dataset: Dataset, output_dir: Path, desc: str) -> dict:
+    def evaluate(self, dataset: Dataset, output_dir: Path, desc: str) -> dict:
         '''
         Overriders of this must:
 
         - call `self.eval_loop`!!
         - return a dict with keys: 'result' and 'preds'.
         '''
-        raise NotImplementedError
+        self.init_eval_result()
+        self.eval_loop(dataset, desc)
+        self.on_eval_end(desc, output_dir)
 
+    def init_eval_result(self):
+        self.total_loss = 0
+        self.all_labels = []
+        self.all_preds = []
+    
+    def gather_eval_result(self, step: int, batch: dict, outputs):
+        '''
+        Called at the end of each evaluation step,
+        should gather result from this batch.
+        '''
+        loss = outputs.loss
+        self.total_loss += loss.item()
+        logits = outputs.logits       # (B, C)
+        pred_ids = logits.argmax(-1)  # (B)
+        self.all_preds += pred_ids.tolist()
+        self.all_labels += batch['labels'].tolist()
+        
+    def on_eval_end(self, dataset, desc: str, output_dir: Path):
+        '''
+        Called at the end of each evaluation loop (`self.evaluate`).
+        '''
+        # Process gathered result
+        output_dir.mkdir(exist_ok=True, parents=True)
+        # TODO: remove on release
+        dump_json(self.all_preds, 'preds.json')  
+        dump_json(self.all_labels, 'labels.json')
+
+        id2label = dataset.get_id2label()
+        metrics = get_metrics(self.all_labels, self.all_preds, id2label)
+
+        result = {
+            'prec': metrics['prec'],
+            'f1': metrics['f1'],
+            'recall': metrics['recall'],
+            'loss': self.total_loss / self.num_eval_steps,   # This must be provided for choosing best model
+            'time_elapsed': time() - self.eval_start_time,
+        }
+        self.log(result)
+        return {
+            'result': result,
+            'preds': self.all_preds,
+        }

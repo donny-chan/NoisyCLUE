@@ -1,3 +1,13 @@
+'''
+Train a BERT model on AFQMC data.
+
+This uses the Trainer class of the Huggingface Transformers library. 
+
+Some constant setups:
+- Evaluate and save a checkpoints after each epoch.
+- Use linear LR scheduler.
+- Disable other loggings, and tqdm. 
+'''
 import torch
 assert torch.cuda.is_available()
 
@@ -11,6 +21,7 @@ import numpy as np
 from afqmc.data import AfqmcDataset
 import utils
 from arguments import parse_args
+
 
 
 def _get_dataset(file: Path, phase: str, **kwargs) -> AfqmcDataset:
@@ -89,17 +100,27 @@ def predict(trainer: Trainer, dataset: AfqmcDataset, output_dir: Path):
 def train(trainer: Trainer, args: Namespace):
     train_args = {}
     if args.resume_from_checkpoint:
-        train_args['resume_from_checkpoint'] = True
+        train_args['resume_from_checkpoint'] = args.resume_from_checkpoint
     trainer.train(**train_args)
 
 
 def test(trainer, tokenizer, data_dir):
-    print('Preparing test data')
-    for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
-        print('\nTesting phase:', test_phase, flush=True)
-        data = get_dataset(data_dir, test_phase, tokenizer=tokenizer)
-        predict(trainer, data, output_dir / test_phase)
+    # Test clean
+    print('\nTesting phase: clean', flush=True)
+    file_examples = data_dir / 'test_clean.json'
+    data = AfqmcDataset(file_examples, 'test_clean', tokenizer, 512)
+    predict(trainer, data, output_dir / 'test_clean')
+    
+    # Test noisy
+    for noise_type in ['keyboard', 'asr']:
+        for i in range(1, 4):
+            print('\nTesting phase:', phase_name, flush=True)
+            phase_name = f'test_noisy_{noise_type}_{i}'
+            file_examples = data_dir / f'{phase_name}.json'
+            data = AfqmcDataset(file_examples, phase_name, tokenizer, 512)
+            predict(trainer, data, output_dir / phase_name)
 
+    print('Done testing', flush=True)
 
 # Setup
 args = parse_args()
@@ -119,3 +140,46 @@ print('# params:', utils.get_param_count(model), flush=True)
 trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
 train(trainer, args)
 test(trainer, tokenizer, data_dir)
+
+def train_simple():
+    from afqmc.trainer import AfqmcTrainer
+
+    trainer = AfqmcTrainer(
+        model.cuda(), 
+        output_dir,
+        batch_size=args.batch_size,
+    )
+
+    # Train
+    kwargs = {'tokenizer': tokenizer, 'num_examples': args.num_examples}
+    train_dataset = get_dataset(data_dir, 'train', **kwargs)
+    dev_dataset = get_dataset(data_dir, 'dev', **kwargs)
+    trainer.train(train_dataset, dev_dataset, False)
+
+
+    # Test
+    def do_test(trainer, dataset, output_dir):
+        def parse_result(result):
+            return {'loss': result.metrics['test_loss'],
+                    'acc': get_test_acc(result.predictions, result.label_ids)}
+
+        result = trainer.evaluate(dataset, output_dir, output_dir.name)
+        result_dict = parse_result(result)
+        print('Test result:')
+        print('loss:', result_dict['loss'])
+        print('acc:', result_dict['acc'])
+
+        # Save result
+        output_dir.mkdir(exist_ok=True, parents=True)
+        preds = np.argmax(result.predictions, axis=1) # (N, C) -> (N)
+        utils.dump_str(list(preds), output_dir / 'preds.txt')
+        utils.dump_json(result_dict, output_dir / 'result.json')
+
+
+    print('Preparing test data', flush=True)
+    for test_data in ['keyboard', 'asr']:
+        for test_phase in ['test_clean', 'test_noisy_1', 'test_noisy_2', 'test_noisy_3']:
+            print('\nTesting phase:', test_phase, flush=True)
+            data = get_dataset(data_dir, test_phase, tokenizer=tokenizer)
+            do_test(trainer, data, output_dir / f'{test_data}_{test_phase}')
+

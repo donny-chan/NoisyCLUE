@@ -52,7 +52,15 @@ def dump_args(args: Namespace, file: Path):
     print(s)
 
 def get_acc(preds: np.array, labels: np.array) -> float:
-    return np.mean(np.argmax(preds, axis=1) == labels)
+    assert len(preds) == len(labels)
+    if isinstance(preds, np.array) and isinstance(labels, np.array):
+        return np.mean(np.argmax(preds, axis=1) == labels)
+    else:
+        correct = 0
+        for a, b in zip(preds, labels):
+            if a == b:
+                correct += 1
+        return correct / len(preds)
 
 
 def get_param_count(model: torch.nn.Module) -> int:
