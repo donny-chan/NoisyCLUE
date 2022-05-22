@@ -53,15 +53,19 @@ def test(model: MBartForConditionalGeneration,
 def test_all(trainer: CSpiderTrainer, 
              tokenizer: MBartTokenizerFast, 
              data_dir: Path, 
-             output_dir: Path):
+             output_dir: Path,
+             args: Namespace):
     log('Testing all...')
-    trainer.setup_optimizer_and_scheuler(1e-3, 0)
+    trainer.setup_optimizer_and_scheuler(args.lr, 0)
     trainer.load_best_ckpt()
     model = trainer.model
     
     # Test Clean
     log('*** Testing clean ***')
-    dataset = get_dataset(data_dir / 'test_clean.json', tokenizer)
+    dataset = get_dataset(
+        file=data_dir / 'test_clean.json', 
+        tokenizer=tokenizer,
+        num_examples=args.num_examples)
     test(model, tokenizer, dataset, output_dir / 'test_clean')
     
     # Test Noisy
@@ -71,7 +75,8 @@ def test_all(trainer: CSpiderTrainer,
             log(f'*** Testing phase: {test_name} ***')
             file_examples = data_dir / f'{test_name}.json'
             log(f'Getting dataset from {file_examples}')
-            dataset = get_dataset(file_examples, tokenizer)
+            dataset = get_dataset(file_examples, tokenizer,
+                                  num_examples=args.num_examples)
             # Test
             test(model, tokenizer, dataset, output_dir / test_name)
 
