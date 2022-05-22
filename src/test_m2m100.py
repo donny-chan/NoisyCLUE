@@ -5,9 +5,9 @@ from pathlib import Path
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from transformers import MBartForConditionalGeneration, MBart50TokenizerFast
+from transformers import M2M100ForConditionalGeneration, M2M100Tokenizer
 
-from utils import load_jsonl, dump_jsonl, get_param_count, Logger
+from utils import dump_jsonl, get_param_count, Logger
 from nmt.data import NmtDataset
 
 
@@ -19,9 +19,10 @@ def get_dataset(tokenizer, file, num_examples=None):
     return NmtDataset(file, tokenizer, num_examples=num_examples)
 
 
-def test(model, dataset, output_dir: Path, batch_size=16):
+def test(model, tokenizer, dataset, output_dir: Path, batch_size=16):
     log('Building dataloader...')
     dataloader = DataLoader(dataset, batch_size=batch_size)
+    lang_id_en = tokenizer.get_lang_id('en')
 
     # Results
     preds = []
@@ -32,7 +33,7 @@ def test(model, dataset, output_dir: Path, batch_size=16):
     log(f'# examples: {len(dataset)}')
     for batch in tqdm(dataloader):
         for k, v in batch.items(): batch[k] = v.cuda()  # Move to GPU
-        generated_tokens = model.generate(**batch)
+        generated_tokens = model.generate(**batch, forced_bos_token_id=lang_id_en)
         output = tokenizer.batch_decode(generated_tokens, skip_special_tokens=True)  # Will move to CPU automatically
         preds += output
     log('*** Done testing ***')
@@ -44,39 +45,45 @@ def test(model, dataset, output_dir: Path, batch_size=16):
 
 
 def test_all(model, tokenizer, data_dir: Path, output_dir: Path):
-    log('Testing all...')
-    
     # Test clean 
-    file_examples = data_dir / 'test_clean.json'
-    log(f'*** Testing phase: clean ***')
-    log(f'Loading from {file_examples}')
-    dataset = get_dataset(tokenizer, file_examples)
-    test(model, dataset, output_dir / 'test_clean')
+    def test_clean():
+        file_examples = data_dir / 'test_clean.json'
+        log(f'*** Testing phase: clean ***')
+        log(f'Loading from {file_examples}')
+        dataset = get_dataset(tokenizer, file_examples)
+        test(model, tokenizer, dataset, output_dir / 'test_clean')
     
-    # Test noisy
-    for noise_type in ['keyboard', 'asr']:
-        for i in range(1, 4):
-            test_name = f'test_noisy_{noise_type}_{i}'
-            log(f'*** Testing phase: {test_name} ***')
-            file_examples = data_dir / f'{test_name}.json'
-            dataset = get_dataset(tokenizer, file_examples)
-            test(model, dataset, output_dir / test_name)
+    def test_noisy():
+        # Test noisy
+        for noise_type in ['keyboard', 'asr']:
+            for i in range(2, 4):
+                test_name = f'test_noisy_{noise_type}_{i}'
+                log(f'*** Testing phase: {test_name} ***')
+                file_examples = data_dir / f'{test_name}.json'
+                dataset = get_dataset(tokenizer, file_examples)
+                test(model, tokenizer, dataset, output_dir / test_name)
+                del dataset
+
+    model.eval()
+    # test_clean()
+    test_noisy()
 
 
 if __name__ == '__main__':
-    model_path = "facebook/mbart-large-50-many-to-one-mmt"
+    model_name = "m2m100_418M"
+    model_path = f"facebook/{model_name}"
 
-    output_dir = Path('results/nmt/mbart-large')
+    output_dir = Path(f'results/nmt/{model_name}')
     data_dir = Path('../data/realtypo/nmt')
     log_file = output_dir / 'test.log'
 
     logger = Logger(log_file)
 
     log('Getting model...')
-    model = MBartForConditionalGeneration.from_pretrained(model_path).cuda()
+    model = M2M100ForConditionalGeneration.from_pretrained(model_path).cuda()
     log('Getting tokenizer...')
-    tokenizer = MBart50TokenizerFast.from_pretrained(model_path)
-    tokenizer.src_lang = "zh_CN"
+    tokenizer = M2M100Tokenizer.from_pretrained(model_path)
+    tokenizer.src_lang = "zh"
     log(f'# params: {get_param_count(model)}')
     
     # Test

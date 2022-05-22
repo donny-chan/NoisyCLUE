@@ -112,8 +112,8 @@ class Trainer:
         grad_acc_steps: int=1,
         lr: float=1e-4,
         log_interval: int=1,
-        eval_interval: int=500,
-        eval_strategy: str='step',
+        eval_interval: int=1,
+        eval_strategy: str='epoch',
         do_log_to_file: bool=True,
         log_file: str=None,
         ):
@@ -215,7 +215,10 @@ class Trainer:
         return self.get_last_ckpt_file().exists()
 
     def load_best_ckpt(self):
-        '''Load best checkpoint in `self.output_dir` by dev loss'''
+        '''
+        Load best checkpoint in `self.output_dir` by dev loss,
+        will change value of `self.model`.
+        '''
         min_loss = float('inf')
         best_ckpt_dir = None
         for ckpt_dir in sorted(self.output_dir.glob('checkpoint-*')):
@@ -405,6 +408,7 @@ class Trainer:
         
 
     def train_step(self, step: int, batch: dict):
+        batch = self.prepare_batch(batch)
         self.cur_train_step += 1
 
         # Forward

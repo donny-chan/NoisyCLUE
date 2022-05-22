@@ -7,7 +7,7 @@
 model_path="mt5-base"
 lr="1e-4"
 
-output_dir="results/nmt/${model_path}_const-lr${lr}"
+output_dir="results/nmt/${model_path}_lr${lr}"
 data_dir="..."
 
 # Command

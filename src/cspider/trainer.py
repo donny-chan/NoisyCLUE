@@ -9,10 +9,7 @@ from utils import dump_json
 from .data import CSpiderDataset
 
 
-class UNParallelTrainer(Trainer):
-    def get_train_dataloader(self, dataset):
-        return DataLoader(dataset, batch_size=self.batch_size)
-
+class CSpiderTrainer(Trainer):
     def setup_optimizer_and_scheuler(
         self, 
         lr: float, 
@@ -20,7 +17,7 @@ class UNParallelTrainer(Trainer):
         weight_decay: float = 0.01, 
         warmup_ratio: float = 0.1):
         '''Override parent method, use Adafactor '''
-        self.log('Setting up Adafactor optimizer and scheduler...')
+        self.log('[CSpiderTrainer] Setting up Adafactor optimizer and scheduler...')
         self.optimizer = Adafactor(
             self.model.parameters(), 
             scale_parameter=False, 
@@ -50,7 +47,6 @@ class UNParallelTrainer(Trainer):
                 'time_elapsed': time() - self.eval_start_time,
             })
 
-
     def evaluate(self,
         dataset: CSpiderDataset,
         output_dir: Path,
@@ -62,7 +58,6 @@ class UNParallelTrainer(Trainer):
         self.all_preds = []
         self.all_labels = []
 
-        dataset.reset()
         self.eval_loop(dataset, desc)  # Must call this, this will call `eval_step`
 
         dump_json(self.all_preds, 'preds.json')
@@ -79,4 +74,3 @@ class UNParallelTrainer(Trainer):
             'result': result,
             'preds': self.all_preds
         }
-        

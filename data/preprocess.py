@@ -1,3 +1,11 @@
+'''
+Steps:
+1. Rename finals in `keyboard` and `asr` directory.
+2. Preprocess into desired format, and split noisy examples into three different files.
+3. Copy to `realtypo` directory.
+
+'''
+
 from pathlib import Path
 import os
 from shutil import copy, copytree
@@ -42,10 +50,9 @@ for noise_type in ['keyboard', 'asr']:
         process(data_dir)
     print('---------')
 
-# Reorder noisy test files
-dst_dir = Path('realtypo')
 
 # Copy noisy test files
+dst_dir = Path('realtypo')
 print('---------------------------')
 print(f'*** Copying files to {dst_dir} ***')
 print('destination dir:', dst_dir)
