@@ -40,7 +40,7 @@ def get_preds(dir) -> list:
         return None
 
 
-def get_result(result_dir, noise_type, labels):
+def get_result(result_dir: Path, test_name: str, labels: list) -> dict:
     result = defaultdict()
     
     total_pos = labels.count(1)
@@ -90,63 +90,83 @@ def get_result(result_dir, noise_type, labels):
             result[f'{pos_neg}_avg'] = sum(noisy_accs) / len(noisy_accs)
 
     def get_metrics(result: dict, dir):
-        # Clean
-        preds = get_preds(dir / 'test_clean')
-        if preds:
-            acc_pos, acc_neg = get_pos_neg_acc(labels, preds)
-            result['pos_acc_clean'] = acc_pos
-            result['neg_acc_clean'] = acc_neg
+        # # Clean
+        # preds = get_preds(dir / 'test_clean')
+        # if preds:
+        #     acc_pos, acc_neg = get_pos_neg_acc(labels, preds)
+        #     result['pos_acc_clean'] = acc_pos
+        #     result['neg_acc_clean'] = acc_neg
         
         # Noisy
-        for i in range(1, 4):
-            test_name = f'test_noisy_{noise_type}_{i}'
-            preds = get_preds(dir / test_name)
-            if preds == None:
-                continue
-            acc_pos, acc_neg = get_pos_neg_acc(labels, preds)
-            result[f'pos_acc_noisy_{i}'] = acc_pos
-            result[f'neg_acc_noisy_{i}'] = acc_neg
+        # for i in range(1, 4):
+        # test_name = f'test_noisy_{noise_type}_{i}'
+        # test_name = f'test_synthetic_noise_{noise_type}'
+        preds = get_preds(dir / test_name)
+        if preds == None:
+            return {}
+        acc_pos, acc_neg = get_pos_neg_acc(labels, preds)
+        result['pos_acc'] = acc_pos
+        result['neg_acc'] = acc_neg
 
     get_metrics(result, result_dir)
-    get_worst_group_acc(result)
-    get_avg_acc(result)
+    # get_worst_group_acc(result)
+    # get_avg_acc(result)
     return result
 
 
-def get_table(task, results_dir, noise_type, model_pattern='*'):
+def get_table(task, results_dir, model_pattern='*'):
     labels = get_labels(task)
     results_dir = Path(results_dir) / task
 
     headers = {
         'model': str,
-        'pos_acc_clean': float,
-        'pos_acc_noisy_1': float,
-        'pos_acc_noisy_2': float,
-        'pos_acc_noisy_3': float,
-        'pos_avg': float,
-        'pos_worst': float,
-        'neg_acc_clean': float,
-        'neg_acc_noisy_1': float,
-        'neg_acc_noisy_2': float,
-        'neg_acc_noisy_3': float,
-        'neg_avg': float,
-        'neg_worst': float,
+        'test_name': str,
+        'pos_acc': float,
+        'neg_acc': float,
+        # 'pos_acc_clean': float,
+        # 'pos_acc_noisy_1': float,
+        # 'pos_acc_noisy_2': float,
+        # 'pos_acc_noisy_3': float,
+        # 'pos_glyph_50': float,
+        # 'pos_glyph_100': float,
+        # 'pos_phonetic_10': float,
+        # 'pos_avg': float,
+        # 'pos_worst': float,
+        # 'neg_acc_clean': float,
+        # 'neg_acc_noisy_1': float,
+        # 'neg_acc_noisy_2': float,
+        # 'neg_acc_noisy_3': float,
+        # 'neg_avg': float,
+        # 'neg_worst': float,
     }
     types = list(headers.values())
     headers = list(headers.keys())
 
     print(f'Getting results from {results_dir}')
     rows = []
-    subdirs = sorted(d for d in results_dir.glob(model_pattern) if d.is_dir())
-    for result_dir in subdirs:
-        result = get_result(result_dir, noise_type, labels)
-        row = [result.get(h, None) for h in headers[1:]]
-        row = [result_dir.name] + row
-        rows.append(row)
+    model_dirs = sorted(d for d in results_dir.glob(model_pattern) if d.is_dir())
+    for model_dir in model_dirs:
+        for test_name in [
+            'test_clean',
+            'test_synthetic_noise_glyph_50',
+            'test_synthetic_noise_glyph_100',
+            'test_synthetic_noise_phonetic_0',
+            'test_synthetic_noise_phonetic_10',
+            'test_synthetic_noise_phonetic_20',
+            'test_synthetic_noise_phonetic_30',
+            'test_synthetic_noise_phonetic_40',
+            'test_synthetic_noise_phonetic_50',
+        ]:
+            result = get_result(model_dir, test_name, labels)
+            # print(result)
+            # exit()
+            row = [result.get(h, None) for h in headers[2:]]
+            row = [model_dir.name, test_name] + row
+            rows.append(row)
 
-    headers = [h.replace('_', ' ') for h in headers]
+    # headers = [h.replace('_', ' ') for h in headers]
     print_table(rows, headers, types)
-    dump_table(rows, headers, types, results_dir / f'table_{noise_type}.tsv')
+    dump_table(rows, headers, types, results_dir / f'table_synthetic_noise.tsv')
 
 
 def main():
@@ -154,9 +174,9 @@ def main():
     task = 'afqmc_unbalanced'
     results_dir = 'results/huggingface'
     model_pattern = '*'  # get all models
-    for noise_type in ['keyboard', 'asr']:
-        print(f'Getting results for {noise_type}')
-        get_table(task, results_dir, noise_type, model_pattern)
+    # for noise_type in ['keyboard', 'asr']:
+        # print(f'Getting results for {noise_type}')
+    get_table(task, results_dir, model_pattern)
     
 
 if __name__ == '__main__':
