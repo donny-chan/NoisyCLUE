@@ -6,8 +6,6 @@ def parse_args():
     p.add_argument('--data_dir', required=True)
     p.add_argument('--output_dir', required=True)
 
-    p.add_argument('--mode', default='', help='"", "train", "test" or "train test"')
-    
     # Hyperparameters
     p.add_argument('--batch_size', type=int, default=8)
     p.add_argument('--num_epochs', type=int, default=10)
@@ -26,5 +24,6 @@ def parse_args():
 
     # Debugging
     p.add_argument('--num_examples', type=int)
+    p.add_argument('--mode', default='train test')
 
     return p.parse_args()

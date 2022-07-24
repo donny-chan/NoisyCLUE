@@ -17,3 +17,9 @@ def load_tsv(file):
     lines = open(file, 'r').readlines() 
     lines = [line.split('\t') for line in lines]
     return lines
+
+def load_json(file):
+    return json.load(open(file, 'r'))
+
+def dump_json(data, file, **kwargs):
+    json.dump(data, open(file, 'w', encoding='utf8'), ensure_ascii=False, **kwargs)
