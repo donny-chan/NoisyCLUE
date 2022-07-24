@@ -11,7 +11,10 @@ table.tsv
 # Task data
 all_tsv
 data/afqmc
-# data/autoasr
+data/autoasr
+data/asr
+data/realtypo
+data/synthetic_noise
 data/keyboard/cspider
 data/keyboard/nmt
 data/keyboard/cmrc2018

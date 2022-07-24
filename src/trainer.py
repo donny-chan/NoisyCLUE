@@ -167,10 +167,10 @@ class Trainer:
             self.log(f'{key:>16}: {getattr(self, key)}')
         self.log('---------------------------------')
 
-    def setup_optimizer_and_scheuler(
+    def setup_optimizer_and_scheduler(
         self, 
-        lr: float,
-        num_opt_steps: int, 
+        lr: float=0.5,
+        num_opt_steps: int=100, 
         weight_decay: float=0.01,
         warmup_ratio: float=0.1):
         '''
@@ -281,6 +281,8 @@ class Trainer:
         self.load_model(ckpt_dir / 'pytorch_model.bin')
         ckpt = torch.load(ckpt_dir / 'ckpt.bin')
 
+        if not hasattr(self, 'scheduler') or not hasattr(self, 'optimizer'):
+            self.setup_optimizer_and_scheduler()
         self.scheduler.load_state_dict(ckpt['scheduler'])
         self.optimizer.load_state_dict(ckpt['optimizer'])
         self.train_start_time = time() - ckpt['train_elapsed']
@@ -303,6 +305,7 @@ class Trainer:
         
         result = eval_output['result']
         preds = eval_output['preds']
+        self.log(f'Dumping result and preds to {ckpt_dir}')
         dump_json(result, ckpt_dir / f'eval_result.json')
         dump_json(preds, ckpt_dir / f'preds.json')
 
@@ -321,14 +324,14 @@ class Trainer:
 
         # Optimizer
         num_opt_steps = len(train_dataloader) // self.grad_acc_steps * self.num_epochs
-        self.setup_optimizer_and_scheuler(self.lr, num_opt_steps)
+        self.setup_optimizer_and_scheduler(self.lr, num_opt_steps)
 
         # Handle resumption
         if resume and self.can_resume():
             self.resume()
             # TODO: This is incorrect?
             self.validate(dev_dataset)
-            self.cur_epoch += 1
+            # self.cur_epoch += 1
         else:
             self.cur_epoch = 0
             self.cur_train_step = 0
@@ -441,7 +444,7 @@ class Trainer:
         '''
         self.init_eval_result()
         self.eval_loop(dataset, desc)
-        self.on_eval_end(desc, output_dir)
+        return self.on_eval_end(dataset, desc, output_dir)
 
     def init_eval_result(self):
         self.total_loss = 0
@@ -459,7 +462,19 @@ class Trainer:
         pred_ids = logits.argmax(-1)  # (B)
         self.all_preds += pred_ids.tolist()
         self.all_labels += batch['labels'].tolist()
-        
+    
+    def get_metrics(self, labels, preds) -> dict:
+        assert len(labels) == len(preds)
+        total = len(labels)
+        match = 0
+        for label, pred in zip(labels, preds):
+            if label == pred:
+                match += 1
+        result = {
+            'acc': match / total
+        }
+        return result
+    
     def on_eval_end(self, dataset, desc: str, output_dir: Path):
         '''
         Called at the end of each evaluation loop (`self.evaluate`).
@@ -467,20 +482,22 @@ class Trainer:
         # Process gathered result
         output_dir.mkdir(exist_ok=True, parents=True)
         # TODO: remove on release
-        dump_json(self.all_preds, 'preds.json')  
-        dump_json(self.all_labels, 'labels.json')
+        dump_json(self.all_preds, output_dir / 'preds.json')  
+        dump_json(self.all_labels, output_dir / 'labels.json')
 
-        id2label = dataset.get_id2label()
-        metrics = get_metrics(self.all_labels, self.all_preds, id2label)
+        # id2label = dataset.get_id2label()
+        metrics = self.get_metrics(self.all_labels, self.all_preds)
 
         result = {
-            'prec': metrics['prec'],
-            'f1': metrics['f1'],
-            'recall': metrics['recall'],
+            # 'prec': metrics['prec'],
+            # 'f1': metrics['f1'],
+            # 'recall': metrics['recall'],
+            'acc': metrics['acc'],
             'loss': self.total_loss / self.num_eval_steps,   # This must be provided for choosing best model
             'time_elapsed': time() - self.eval_start_time,
         }
         self.log(result)
+        # return result
         return {
             'result': result,
             'preds': self.all_preds,

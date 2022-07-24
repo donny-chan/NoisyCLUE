@@ -16,6 +16,7 @@ from argparse import Namespace
 
 from transformers import BertForSequenceClassification, BertTokenizer
 from transformers.trainer import Trainer, TrainingArguments
+from trainer import Trainer
 import numpy as np
 
 from afqmc.data import AfqmcDataset
@@ -28,7 +29,7 @@ def _get_dataset(file: Path, phase: str, **kwargs) -> AfqmcDataset:
     return AfqmcDataset(file, phase, max_seq_len=512, **kwargs)
 
 
-def  get_dataset(data_dir: Path, phase: str, **kwargs) -> AfqmcDataset:
+def get_dataset(data_dir: Path, phase: str, **kwargs) -> AfqmcDataset:
     return _get_dataset(data_dir / f'{phase}.json', phase, **kwargs)
 
 
@@ -36,11 +37,17 @@ def get_test_acc(preds: np.array, labels: np.array) -> float:
     return (np.argmax(preds, axis=1) == labels).mean()
 
 
-def get_trainer(model: BertForSequenceClassification, tokenizer: BertTokenizer,
-                data_dir: Path, output_dir: Path, args: Namespace) -> Trainer:
+def get_train_dev_dataset(data_dir, tokenizer, num_examples):
     kwargs = {'tokenizer': tokenizer, 'num_examples': args.num_examples}
     train_dataset = get_dataset(data_dir, 'train', **kwargs)
-    eval_dataset = get_dataset(data_dir, 'dev', **kwargs)
+    dev_dataset = get_dataset(data_dir, 'dev', **kwargs)
+    return train_dataset, dev_dataset
+
+
+def get_trainer(model: BertForSequenceClassification, tokenizer: BertTokenizer,
+                data_dir: Path, output_dir: Path, args: Namespace) -> Trainer:
+    # train_dataset, dev_dataset = get_train_dev_dataset(
+    #     data_dir, tokenizer, num_examples=args.num_examples)
     
     # Hyperparameters
     batch_size = args.batch_size
@@ -49,52 +56,68 @@ def get_trainer(model: BertForSequenceClassification, tokenizer: BertTokenizer,
     warmup_ratio = 0.1
     lr = args.lr
     
-    train_args = TrainingArguments(
-        output_dir=output_dir,
-        overwrite_output_dir=True, # TODO: remove on release
-        do_train=True,
-        do_predict=True,
-        per_device_train_batch_size=batch_size,
-        per_device_eval_batch_size=batch_size,
-        gradient_accumulation_steps=grad_acc_steps,
-        evaluation_strategy='epoch',
-        save_strategy='epoch',
-        learning_rate=lr,
-        num_train_epochs=num_epochs,
-        lr_scheduler_type='linear',
-        warmup_ratio=warmup_ratio,
-        logging_first_step=True,
-        logging_steps=args.log_interval,
-        logging_strategy='steps',
-        report_to='none',
-        disable_tqdm=True,
-        seed=args.seed,
-    )
+    # train_args = TrainingArguments(
+    #     output_dir=output_dir,
+    #     overwrite_output_dir=True, # TODO: remove on release
+    #     do_train=True,
+    #     do_predict=True,
+    #     per_device_train_batch_size=batch_size,
+    #     per_device_eval_batch_size=batch_size,
+    #     gradient_accumulation_steps=grad_acc_steps,
+    #     evaluation_strategy='epoch',
+    #     save_strategy='epoch',
+    #     learning_rate=lr,
+    #     num_train_epochs=num_epochs,
+    #     lr_scheduler_type='linear',
+    #     warmup_ratio=warmup_ratio,
+    #     logging_first_step=True,
+    #     logging_steps=args.log_interval,
+    #     logging_strategy='steps',
+    #     report_to='none',
+    #     disable_tqdm=True,
+    #     seed=args.seed,
+    # )    
+    
+    # trainer = Trainer(
+    #     model,
+    #     train_args,
+    #     train_dataset=train_dataset, 
+    #     eval_dataset=eval_dataset,
+    # )
     trainer = Trainer(
-        model,
-        train_args,
-        train_dataset=train_dataset, 
-        eval_dataset=eval_dataset,
+        model=model,
+        output_dir=output_dir,
+        batch_size=args.batch_size,
+        num_epochs=args.num_epochs,
+        grad_acc_steps=args.grad_acc_steps,
+        lr=args.lr,
+        log_interval=args.log_interval,
     )
+    
     return trainer
 
 
 def predict(trainer: Trainer, dataset: AfqmcDataset, output_dir: Path):
-    def parse_result(result):
-        return {'loss': result.metrics['test_loss'],
-                'acc': get_test_acc(result.predictions, result.label_ids)}
+    # def parse_result(result):
+    #     return {'loss': result.metrics['test_loss'],
+    #             'acc': get_test_acc(result.predictions, result.label_ids)}
 
-    result = trainer.predict(dataset)
-    result_dict = parse_result(result)
+    # result = trainer.predict(dataset)
+    result = trainer.evaluate(dataset, output_dir, desc=output_dir.name)
+    # result_dict = parse_result(result)
+    result_dict = result['result']
     print('Test result:')
     print('loss:', result_dict['loss'])
     print('acc:', result_dict['acc'])
 
-    # Save result
-    output_dir.mkdir(exist_ok=True, parents=True)
-    preds = np.argmax(result.predictions, axis=1) # (N, C) -> (N)
-    utils.dump_str(list(preds), output_dir / 'preds.txt')
+    # # Save result
+    # output_dir.mkdir(exist_ok=True, parents=True)
+    # preds = np.argmax(result.predictions, axis=1) # (N, C) -> (N)
+    # utils.dump_str(list(preds), output_dir / 'preds.txt')
+    # utils.dump_json(result_dict, output_dir / 'result.json')
     utils.dump_json(result_dict, output_dir / 'result.json')
+    utils.dump_json(result['preds'], output_dir / 'preds.json')
+    
 
 
 def train(trainer: Trainer, args: Namespace):
@@ -138,5 +161,16 @@ print('# params:', utils.get_param_count(model), flush=True)
 
 # Train
 trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
-train(trainer, args)
-test(trainer, tokenizer, data_dir)
+if 'train' in args.mode:
+    train_dataset, dev_dataset = get_train_dev_dataset(
+        data_dir, tokenizer, args.num_examples)
+    # train(trainer, args)
+    trainer.train(
+        train_dataset,
+        dev_dataset,
+        # resume=False,
+        resume=True,
+    )
+if 'test' in args.mode:
+    trainer.load_best_ckpt()
+    test(trainer, tokenizer, data_dir)
