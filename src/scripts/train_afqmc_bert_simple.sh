@@ -16,13 +16,13 @@ lr="5e-5"
 
 # output_dir="results/${task_parent}/${task}/${model_path}_lr${lr}"
 data_dir="../data/realtypo/${task}"
-output_dir="results/huggingface/${task}/${model_path}_lr${lr}"
+output_dir="results/${task}/${model_path}_lr${lr}"
 # data_dir="../data/synthetic_noise/${task}"
 # output_dir="results/synthetic_noise/${task}/${model_path}_lr${lr}"
 
-ckpt_dir="${output_dir}/checkpoint-1050"
+# ckpt_dir="${output_dir}/checkpoint-1050"
 mode="train_test"
-# mode="test"
+mode="test"
 
 # Command
 cmd="python3 train_afqmc_bert.py"
@@ -37,7 +37,7 @@ cmd+=" --lr $lr"
 cmd+=" --log_interval 80"
 cmd+=" --mode $mode"
 # cmd+=" --num_examples 128"
-cmd+=" --resume_from_checkpoint ${ckpt_dir}"
+# cmd+=" --resume_from_checkpoint ${ckpt_dir}"
 
 logfile="$output_dir/log.txt"
 mkdir -p $output_dir

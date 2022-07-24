@@ -112,13 +112,33 @@ def test(trainer, tokenizer, data_dir):
     predict(trainer, data, output_dir / 'test_clean')
     
     # Test noisy
-    for noise_type in ['keyboard', 'asr']:
-        for i in range(1, 4):
+    for noise_type in [
+        # 'keyboard', 
+        # 'asr',
+        ]:
+        for i in range(1, 2):
             phase_name = f'test_noisy_{noise_type}_{i}'
             print('\nTesting phase:', phase_name, flush=True)
             file_examples = data_dir / f'{phase_name}.json'
             data = AfqmcDataset(file_examples, phase_name, tokenizer, 512)
             predict(trainer, data, output_dir / phase_name)
+
+    for noise_type in [
+        'glyph_50',
+        'glyph_100',
+        # 'phonetic_noise_0',
+        # 'phonetic_noise_10',
+        'phonetic_noise_20',
+        # 'phonetic_noise_30',
+        # 'phonetic_noise_40',
+        'phonetic_noise_50',
+        ]:
+        phase_name = f'test_synthetic_noise_{noise_type}'
+        file_examples = Path('../data/synthetic_noise/afqmc_unbalanced', noise_type, 'test.json')
+        data = AfqmcDataset(file_examples, phase_name, tokenizer, 512)
+        predict(trainer, data, output_dir / phase_name)
+        
+        
 
     print('Done testing', flush=True)
 
@@ -138,5 +158,7 @@ print('# params:', utils.get_param_count(model), flush=True)
 
 # Train
 trainer = get_trainer(model, tokenizer, data_dir, output_dir, args)
-train(trainer, args)
-test(trainer, tokenizer, data_dir)
+if 'train' in args.mode:
+    train(trainer, args)
+if 'test' in args.mode:
+    test(trainer, tokenizer, data_dir)
