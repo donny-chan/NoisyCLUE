@@ -126,12 +126,12 @@ def test(trainer, tokenizer, data_dir):
     for noise_type in [
         'glyph_50',
         'glyph_100',
-        # 'phonetic_noise_0',
-        # 'phonetic_noise_10',
-        'phonetic_noise_20',
-        # 'phonetic_noise_30',
-        # 'phonetic_noise_40',
-        'phonetic_noise_50',
+        'phonetic_0',
+        'phonetic_10',
+        'phonetic_20',
+        'phonetic_30',
+        'phonetic_40',
+        'phonetic_50',
         ]:
         phase_name = f'test_synthetic_noise_{noise_type}'
         file_examples = Path('../data/synthetic_noise/afqmc_unbalanced', noise_type, 'test.json')
